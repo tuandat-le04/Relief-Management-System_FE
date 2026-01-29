@@ -1,6 +1,6 @@
 import React from 'react';
-import Table from '../common/Table';
-import Button from '../common/Button';
+import Table from '../Common/Table';
+import Button from '../Common/Button';
 
 const SupplyList = ({ supplies, onUpdate }) => {
     const columns = [
