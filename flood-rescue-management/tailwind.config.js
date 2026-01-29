@@ -1,9 +1,20 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  content: ["./src/**/*.{js,jsx,ts,tsx}", "./public/index.html"],
+  darkMode: "class",
+  content: ["./src/**/*.{js,jsx,ts,tsx}", "./public/index.html", "./index.html"],
   theme: {
     extend: {
       colors: {
+        "primary": "#1d9ec9",
+        "primary-dark": "#063660",
+        "secondary": "#E53935",
+        "background-light": "#f1f2f4",
+        "background-dark": "#1a1f23",
+        "surface-light": "#ffffff",
+        "surface-dark": "#2C3238",
+        "surface-darker": "#1c2426",
+        "border-dark": "#3d4d52",
+        "text-secondary": "#9eb1b7",
         dark: {
           bg: "#1a1d29",
           card: "#252836",
@@ -25,6 +36,13 @@ module.exports = {
           pending: "#f59e0b",
         },
       },
+      fontFamily: {
+        "display": ["Manrope", "sans-serif"]
+      },
+      boxShadow: {
+        'soft': '0 4px 20px -2px rgba(0, 0, 0, 0.05)',
+        'glow': '0 0 15px rgba(10, 75, 133, 0.15)',
+      }
     },
   },
   plugins: [],
