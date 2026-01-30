@@ -40,7 +40,7 @@ const CitizenDashboard = () => {
         <div className="px-4 py-6 sm:px-0">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-              Chào mừng, {user?.email}!
+              Chào mừng đến với hệ thống, {user?.email}!
             </h2>
             <p className="text-gray-600 dark:text-gray-300">
               Đây là trang dashboard dành cho người dân.
