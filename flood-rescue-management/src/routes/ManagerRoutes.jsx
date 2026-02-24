@@ -1,6 +1,7 @@
 import React from "react";
 // import ProtectedRoute from "../components/ProtectedRoute"; // Tạm thời comment để xem preview
 import ManagerDashboard from "../pages/Manager/ManagerDashboard";
+import ManagerVehicle from "../pages/Manager/ManagerVehicle";
 
 const ManagerRoutes = [
   {
@@ -9,6 +10,15 @@ const ManagerRoutes = [
     // element: (
     //   <ProtectedRoute allowedRoles={["manager"]}>
     //     <ManagerDashboard />
+    //   </ProtectedRoute>
+    // ),
+  },
+  {
+    path: "/manager/vehicles",
+    element: <ManagerVehicle />,
+    // element: (
+    //   <ProtectedRoute allowedRoles={["manager"]}>
+    //     <ManagerVehicle />
     //   </ProtectedRoute>
     // ),
   },
