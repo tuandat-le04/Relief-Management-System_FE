@@ -3,9 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import authService from "../services/authService";
 
 const Login = () => {
-  const [activeTab, setActiveTab] = useState("citizen"); // 'citizen' or 'staff'
   const [showPassword, setShowPassword] = useState(false);
-  const [language, setLanguage] = useState("vn"); // 'vn' or 'en'
+  const [language, setLanguage] = useState("vn");
   const [formData, setFormData] = useState({
     username: "",
     password: "",
@@ -40,34 +39,41 @@ const Login = () => {
 
       // Call login API
       const response = await authService.login({
-        email: formData.username, // Backend expects 'email' field
+        email: formData.username,
         password: formData.password,
       });
 
-      if (response.success) {
-        // Redirect based on role
-        const user = authService.getCurrentUser();
+      console.log("Login response:", response); // Debug log
 
-        switch (user.role) {
-          case "ADMIN":
-            navigate("/admin/dashboard");
-            break;
-          case "RESCUE_COORDINATOR":
-            navigate("/coordinator/dashboard");
-            break;
-          case "MANAGER":
-            navigate("/manager/dashboard");
-            break;
-          case "CITIZEN":
-            navigate("/citizen/dashboard");
-            break;
-          default:
-            navigate("/dashboard");
+      if (response.success) {
+        // Get user info
+        const user = authService.getCurrentUser();
+        console.log("Current user:", user); // Debug log
+        console.log("User role:", user?.role); // Debug log
+
+        // Redirect based on role with fallback
+        if (!user || !user.role) {
+          console.error("User or role is undefined");
+          setError("Không thể xác định quyền người dùng");
+          setLoading(false);
+          return;
         }
+
+        const roleRoutes = {
+          ADMIN: "/admin/dashboard",
+          RESCUE_COORDINATOR: "/coordinator/dashboard",
+          RESCUE_TEAM: "/rescue-team/dashboard",
+          MANAGER: "/manager/dashboard",
+          CITIZEN: "/citizen/dashboard",
+        };
+
+        const targetRoute = roleRoutes[user.role] || "/dashboard";
+        console.log("Navigating to:", targetRoute); // Debug log
+
+        navigate(targetRoute, { replace: true });
       }
     } catch (err) {
       console.error("Login error:", err);
-      // Customize error message for disabled users
       if (err.message && err.message.toLowerCase().includes("disabled")) {
         setError(
           "Tài khoản của bạn chưa được kích hoạt. Vui lòng liên hệ quản trị viên hoặc chờ phê duyệt.",
@@ -197,58 +203,11 @@ const Login = () => {
         <div className="flex-1 flex items-center justify-center px-6 py-12 lg:py-6">
           <div className="w-full max-w-[440px]">
             <div className="bg-surface-light dark:bg-surface-dark rounded-2xl shadow-soft dark:shadow-none dark:border dark:border-gray-700 overflow-hidden">
-              {/* Tab Selection */}
-              <div className="grid grid-cols-2 border-b border-gray-100 dark:border-gray-700">
-                <button
-                  onClick={() => setActiveTab("citizen")}
-                  className={`relative flex flex-col items-center justify-center py-4 transition-colors group ${
-                    activeTab === "citizen"
-                      ? "bg-white dark:bg-surface-dark"
-                      : "bg-gray-50 dark:bg-[#162032] hover:bg-gray-100 dark:hover:bg-gray-800"
-                  }`}
-                >
-                  <span
-                    className={`text-sm font-bold tracking-wide ${
-                      activeTab === "citizen"
-                        ? "text-primary dark:text-blue-400"
-                        : "text-gray-500 dark:text-gray-400"
-                    }`}
-                  >
-                    Người dân
-                  </span>
-                  {activeTab === "citizen" && (
-                    <span className="absolute bottom-0 left-0 w-full h-[3px] bg-primary" />
-                  )}
-                </button>
-
-                <button
-                  onClick={() => setActiveTab("staff")}
-                  className={`relative flex flex-col items-center justify-center py-4 transition-colors ${
-                    activeTab === "staff"
-                      ? "bg-white dark:bg-surface-dark"
-                      : "bg-gray-50 dark:bg-[#162032] hover:bg-gray-100 dark:hover:bg-gray-800"
-                  }`}
-                >
-                  <span
-                    className={`text-sm font-bold tracking-wide ${
-                      activeTab === "staff"
-                        ? "text-primary dark:text-blue-400"
-                        : "text-gray-500 dark:text-gray-400"
-                    }`}
-                  >
-                    Cán bộ / TNV
-                  </span>
-                  {activeTab === "staff" && (
-                    <span className="absolute bottom-0 left-0 w-full h-[3px] bg-primary" />
-                  )}
-                </button>
-              </div>
-
               {/* Form */}
               <div className="p-8">
                 <div className="mb-8">
                   <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                    Chào mừng trở lại
+                    Đăng nhập hệ thống
                   </h2>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
                     Vui lòng nhập thông tin để truy cập hệ thống.
@@ -256,15 +215,15 @@ const Login = () => {
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-5">
-                  {/* Username/Phone Input */}
+                  {/* Email Input */}
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider ml-1">
-                      Số điện thoại / Email
+                      Email
                     </label>
                     <div className="relative group">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <span className="material-symbols-outlined text-gray-400 group-focus-within:text-primary text-[20px]">
-                          person
+                          mail
                         </span>
                       </div>
                       <input
@@ -272,8 +231,9 @@ const Login = () => {
                         value={formData.username}
                         onChange={handleInputChange}
                         className="block w-full pl-10 pr-3 py-3 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white dark:bg-gray-800 transition-all text-sm font-medium"
-                        placeholder="Ví dụ: 0912345678"
-                        type="text"
+                        placeholder="example@email.com"
+                        type="email"
+                        required
                       />
                     </div>
                   </div>

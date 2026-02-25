@@ -33,16 +33,13 @@ const authService = {
     try {
       const response = await api.post("/auth/login", credentials);
 
-      // Lưu token và thông tin user vào localStorage
-      if (response.data.success && response.data.data) {
-        const { token, refreshToken, userId, email, role } = response.data.data;
+      // Lưu token
+      localStorage.setItem("token", response.data.token);
 
-        localStorage.setItem("accessToken", token);
-        localStorage.setItem("refreshToken", refreshToken);
-        localStorage.setItem("user", JSON.stringify({ userId, email, role }));
-      }
+      // Lưu user info (quan trọng!)
+      localStorage.setItem("user", JSON.stringify(response.data.user));
 
-      return response.data;
+      return { success: true, user: response.data.user };
     } catch (error) {
       console.error("Login API error:", error.response || error);
 
@@ -106,8 +103,17 @@ const authService = {
    * @returns {Object|null}
    */
   getCurrentUser: () => {
-    const userStr = localStorage.getItem("user");
-    return userStr ? JSON.parse(userStr) : null;
+    try {
+      const userStr = localStorage.getItem("user");
+      if (!userStr) return null;
+
+      const user = JSON.parse(userStr);
+      console.log("getCurrentUser:", user); // Debug
+      return user;
+    } catch (error) {
+      console.error("Error getting current user:", error);
+      return null;
+    }
   },
 };
 
