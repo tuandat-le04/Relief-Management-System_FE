@@ -3,6 +3,7 @@ import React from "react";
 import ManagerDashboard from "../pages/Manager/ManagerDashboard";
 import ManagerVehicle from "../pages/Manager/ManagerVehicle";
 import ManagerInventory from "../pages/Manager/ManagerInventory";
+import ManagerReports from "../pages/Manager/ManagerReports";
 
 const ManagerRoutes = [
   {
@@ -31,19 +32,20 @@ const ManagerRoutes = [
     //       <InventoryManagement />
     //     </ProtectedRoute>
   },
+  {
+    path: "/manager/reports",
+    element: <ManagerReports />,
+    // element: (
+    //   <ProtectedRoute allowedRoles={["manager"]}>
+    //     <ManagerReports />
+    //   </ProtectedRoute>
+    // ),
+  },
   // {
   //   path: "/manager/distribution",
   //   element: (
   //     <ProtectedRoute allowedRoles={["manager"]}>
   //       <DistributionManagement />
-  //     </ProtectedRoute>
-  //   ),
-  // },
-  // {
-  //   path: "/manager/reports",
-  //   element: (
-  //     <ProtectedRoute allowedRoles={["manager"]}>
-  //       <ManagerReports />
   //     </ProtectedRoute>
   //   ),
   // },
