@@ -12,7 +12,7 @@ const api = axios.create({
 // Request interceptor - Thêm token vào mỗi request
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("accessToken");
+    const token = localStorage.getItem("token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -43,12 +43,12 @@ api.interceptors.response.use(
         // return api(originalRequest);
 
         // Nếu không có refresh token API, logout user
-        localStorage.removeItem("accessToken");
+        localStorage.removeItem("token");
         localStorage.removeItem("refreshToken");
         localStorage.removeItem("user");
         window.location.href = "/login";
       } catch (refreshError) {
-        localStorage.removeItem("accessToken");
+        localStorage.removeItem("token");
         localStorage.removeItem("refreshToken");
         localStorage.removeItem("user");
         window.location.href = "/login";
