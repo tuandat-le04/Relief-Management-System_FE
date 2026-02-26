@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Sidebar from "../../components/admin/Sidebar";
 import avatarUser from "../../assets/images/avatar-user.png";
+import { getAllUsers } from "../../services/userService";
 import {
   People,
   CheckCircle,
@@ -25,13 +26,94 @@ export default function AdminDashboard() {
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [viewMode, setViewMode] = useState("table"); // table or grid
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Statistics data
+  // Lấy danh sách người dùng từ API
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        setLoading(true);
+        const response = await getAllUsers();
+        if (response.success && response.data) {
+          setUsers(response.data);
+        }
+      } catch (err) {
+        console.error("Lỗi khi tải danh sách người dùng:", err);
+        setError(err.message || "Không thể tải danh sách người dùng");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUsers();
+  }, []);
+
+  // Hàm chuyển đổi vai trò từ tiếng Anh sang tiếng Việt
+  const getRoleLabel = (role) => {
+    const roleMap = {
+      ADMIN: "Quản trị viên",
+      MANAGER: "Quản lý",
+      COORDINATOR: "Điều phối viên",
+      RESCUE_TEAM: "Đội cứu hộ",
+      CITIZEN: "Người dân",
+    };
+    return roleMap[role] || role;
+  };
+
+  // Hàm lấy màu cho vai trò
+  const getRoleColor = (role) => {
+    const colorMap = {
+      ADMIN: "purple",
+      MANAGER: "purple",
+      COORDINATOR: "blue",
+      RESCUE_TEAM: "orange",
+      CITIZEN: "slate",
+    };
+    return colorMap[role] || "slate";
+  };
+
+  // Hàm chuyển đổi trạng thái
+  const getStatusFromActive = (isActive) => {
+    return isActive ? "active" : "locked";
+  };
+
+  // Hàm format ngày tháng
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
+  // Chuyển đổi dữ liệu API sang format hiển thị
+  const transformedUsers = users.map((user) => ({
+    id: user.id,
+    name: user.fullName,
+    email: user.email,
+    phone: user.phoneNumber,
+    avatar: avatarUser,
+    role: getRoleLabel(user.role),
+    roleColor: getRoleColor(user.role),
+    unit: "Đơn vị chưa cập nhật", // API không trả về thông tin này
+    joinDate: formatDate(user.createdAt),
+    status: getStatusFromActive(user.isActive),
+  }));
+
+  // Tính toán thống kê từ dữ liệu thực tế
+  const totalUsers = users.length;
+  const activeUsers = users.filter((u) => u.isActive).length;
+  const lockedUsers = users.filter((u) => !u.isActive).length;
+
+  // Statistics data - Cập nhật với dữ liệu thực tế
   const stats = [
     {
       id: 1,
       label: "Tổng người dùng",
-      value: "128",
+      value: totalUsers.toString(),
       change: "+12%",
       changeType: "increase",
       icon: <People sx={{ fontSize: 24 }} />,
@@ -42,7 +124,7 @@ export default function AdminDashboard() {
     {
       id: 2,
       label: "Đang hoạt động",
-      value: "94",
+      value: activeUsers.toString(),
       change: "+8%",
       changeType: "increase",
       icon: <CheckCircle sx={{ fontSize: 24 }} />,
@@ -53,7 +135,7 @@ export default function AdminDashboard() {
     {
       id: 3,
       label: "Chờ duyệt",
-      value: "22",
+      value: "0",
       change: "-3%",
       changeType: "decrease",
       icon: <HourglassEmpty sx={{ fontSize: 24 }} />,
@@ -64,66 +146,13 @@ export default function AdminDashboard() {
     {
       id: 4,
       label: "Đã khóa",
-      value: "12",
+      value: lockedUsers.toString(),
       change: "+2%",
       changeType: "increase",
       icon: <Lock sx={{ fontSize: 24 }} />,
       bgColor: "from-red-500 to-red-600",
       lightBg: "bg-red-500/10",
       lightBorder: "border-red-500/20",
-    },
-  ];
-
-  // Mock data - Replace with actual API data
-  const users = [
-    {
-      id: 1,
-      name: "Nguyễn Văn An",
-      email: "an.nguyen@relief.vn",
-      phone: null,
-      avatar: avatarUser,
-      role: "Quản lý (Manager)",
-      roleColor: "purple",
-      unit: "Trung tâm Điều phối Q.1",
-      joinDate: "12/10/2023",
-      status: "active",
-    },
-    {
-      id: 2,
-      name: "Lê Thị Bình",
-      email: null,
-      phone: "0901234567",
-      avatar: avatarUser,
-      role: "Điều phối viên",
-      roleColor: "blue",
-      unit: "Đội cứu hộ Sông Hàn",
-      joinDate: "15/11/2023",
-      status: "pending",
-    },
-    {
-      id: 3,
-      name: "Trần Văn Cường",
-      email: "cuong.tran@rescueteam.vn",
-      phone: null,
-      avatar: avatarUser,
-      role: "Đội cứu hộ",
-      roleColor: "orange",
-      unit: "Nhóm Phản Ứng Nhanh",
-      joinDate: "01/01/2024",
-      status: "locked",
-    },
-    {
-      id: 4,
-      name: "Phạm Minh",
-      email: "minh.pham@gmail.com",
-      phone: null,
-      avatar: avatarUser,
-      initials: "PM",
-      role: "Người dân (Citizen)",
-      roleColor: "slate",
-      unit: "Phường 5, Quận 3",
-      joinDate: "20/02/2024",
-      status: "active",
     },
   ];
 
@@ -155,6 +184,37 @@ export default function AdminDashboard() {
     };
     return statusMap[status] || statusMap.active;
   };
+
+  // Hiển thị loading state
+  if (loading) {
+    return (
+      <div className="h-screen overflow-hidden flex bg-gray-50">
+        <Sidebar />
+        <main className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-500 mb-4"></div>
+            <p className="text-gray-600">Đang tải dữ liệu...</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // Hiển thị error state
+  if (error) {
+    return (
+      <div className="h-screen overflow-hidden flex bg-gray-50">
+        <Sidebar />
+        <main className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="text-red-500 text-5xl mb-4">⚠️</div>
+            <p className="text-gray-900 font-semibold mb-2">Lỗi tải dữ liệu</p>
+            <p className="text-gray-600">{error}</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen overflow-hidden flex bg-gray-50">
@@ -361,7 +421,7 @@ export default function AdminDashboard() {
                           sx={{ fontSize: 16 }}
                           className="text-emerald-600"
                         />
-                        Vai trò & Đơn vị
+                        Vai trò
                       </div>
                     </th>
                     <th className="py-5 px-6 text-xs font-bold uppercase tracking-wider text-gray-700">
@@ -388,7 +448,7 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {users.map((user) => {
+                  {transformedUsers.map((user) => {
                     const statusBadge = getStatusBadge(user.status);
                     return (
                       <tr
@@ -420,18 +480,14 @@ export default function AdminDashboard() {
                           </div>
                         </td>
                         <td className="py-5 px-6">
-                          <div className="flex flex-col gap-1.5">
+                          <span
+                            className={`inline-flex w-fit items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${getRoleBadgeClasses(user.roleColor)}`}
+                          >
                             <span
-                              className={`inline-flex w-fit items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${getRoleBadgeClasses(user.roleColor)}`}
-                            >
-                              <span
-                                className={`w-1.5 h-1.5 rounded-full ${user.roleColor === "purple" ? "bg-emerald-500" : user.roleColor === "blue" ? "bg-teal-500" : user.roleColor === "orange" ? "bg-green-500" : "bg-gray-500"}`}
-                              ></span>
-                            </span>
-                            <span className="text-xs text-gray-600 group-hover:text-gray-700">
-                              {user.unit}
-                            </span>
-                          </div>
+                              className={`w-1.5 h-1.5 rounded-full ${user.roleColor === "purple" ? "bg-emerald-500" : user.roleColor === "blue" ? "bg-teal-500" : user.roleColor === "orange" ? "bg-green-500" : "bg-gray-500"}`}
+                            ></span>
+                            {user.role}
+                          </span>
                         </td>
                         <td className="py-5 px-6">
                           <div className="flex items-center gap-2">
@@ -506,11 +562,11 @@ export default function AdminDashboard() {
                   <div className="text-sm text-gray-700">
                     Hiển thị{" "}
                     <span className="font-bold text-gray-900 px-2 py-1 bg-emerald-100 rounded-md">
-                      1-4
+                      1-{transformedUsers.length}
                     </span>{" "}
                     trong tổng số{" "}
                     <span className="font-bold text-gray-900 px-2 py-1 bg-emerald-100 rounded-md">
-                      128
+                      {totalUsers}
                     </span>{" "}
                     người dùng
                   </div>
