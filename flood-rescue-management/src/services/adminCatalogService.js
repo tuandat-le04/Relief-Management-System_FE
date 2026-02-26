@@ -84,3 +84,94 @@ export const getActiveVehicleTypes = async () => {
     throw error;
   }
 };
+
+// ==================== ITEMS API ====================
+
+/**
+ * Lấy danh sách tất cả items
+ * @returns {Promise} Promise với danh sách items
+ */
+export const getAllItems = async () => {
+  try {
+    const response = await api.get("/admin/catalog/items");
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching items:", error);
+    throw error;
+  }
+};
+
+/**
+ * Lấy item theo ID
+ * @param {number} id - ID của item
+ * @returns {Promise}
+ */
+export const getItemById = async (id) => {
+  try {
+    const response = await api.get(`/admin/catalog/items/${id}`);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching item by ID:", error);
+    throw error;
+  }
+};
+
+/**
+ * Tạo mới item
+ * @param {Object} itemData - Dữ liệu item
+ * @returns {Promise}
+ */
+export const createItem = async (itemData) => {
+  try {
+    const response = await api.post("/admin/catalog/items", itemData);
+    return response.data;
+  } catch (error) {
+    console.error("Error creating item:", error);
+    throw error;
+  }
+};
+
+/**
+ * Cập nhật item
+ * @param {number} id - ID của item
+ * @param {Object} itemData - Dữ liệu cập nhật
+ * @returns {Promise}
+ */
+export const updateItem = async (id, itemData) => {
+  try {
+    const response = await api.put(`/admin/catalog/items/${id}`, itemData);
+    return response.data;
+  } catch (error) {
+    console.error("Error updating item:", error);
+    throw error;
+  }
+};
+
+/**
+ * Xóa item
+ * @param {number} id - ID của item
+ * @returns {Promise}
+ */
+export const deleteItem = async (id) => {
+  try {
+    const response = await api.delete(`/admin/catalog/items/${id}`);
+    return response.data;
+  } catch (error) {
+    console.error("Error deleting item:", error);
+    throw error;
+  }
+};
+
+/**
+ * Lấy danh sách items ACTIVE
+ * @returns {Promise} Promise với danh sách items active
+ */
+export const getActiveItems = async () => {
+  try {
+    const response = await api.get("/admin/catalog/items/active");
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching active items:", error);
+    throw error;
+  }
+};
