@@ -38,27 +38,28 @@ const Login = () => {
       }
 
       // Call login API
+      console.log("🔐 Attempting login with:", formData.username);
       const response = await authService.login({
         email: formData.username,
         password: formData.password,
       });
 
-      console.log("Login response:", response); // Debug log
+      console.log("✅ Login response:", response);
 
       if (response.success) {
         // Get user info
         const user = authService.getCurrentUser();
-        console.log("Current user:", user); // Debug log
-        console.log("User role:", user?.role); // Debug log
+        console.log("👤 Current user:", user);
+        console.log("🎭 User role:", user?.role);
 
-        // Redirect based on role with fallback
         if (!user || !user.role) {
-          console.error("User or role is undefined");
-          setError("Không thể xác định quyền người dùng");
+          console.error("❌ User or role is undefined!");
+          setError("Không thể xác định quyền người dùng. Vui lòng thử lại.");
           setLoading(false);
           return;
         }
 
+        // Map routes
         const roleRoutes = {
           ADMIN: "/admin/dashboard",
           RESCUE_COORDINATOR: "/coordinator/dashboard",
@@ -68,12 +69,12 @@ const Login = () => {
         };
 
         const targetRoute = roleRoutes[user.role] || "/dashboard";
-        console.log("Navigating to:", targetRoute); // Debug log
+        console.log("🚀 Navigating to:", targetRoute);
 
         navigate(targetRoute, { replace: true });
       }
     } catch (err) {
-      console.error("Login error:", err);
+      console.error("❌ Login error:", err);
       if (err.message && err.message.toLowerCase().includes("disabled")) {
         setError(
           "Tài khoản của bạn chưa được kích hoạt. Vui lòng liên hệ quản trị viên hoặc chờ phê duyệt.",
@@ -207,7 +208,7 @@ const Login = () => {
               <div className="p-8">
                 <div className="mb-8">
                   <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                    Đăng nhập hệ thống
+                    Đăng nhập - Người dân
                   </h2>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
                     Vui lòng nhập thông tin để truy cập hệ thống.
