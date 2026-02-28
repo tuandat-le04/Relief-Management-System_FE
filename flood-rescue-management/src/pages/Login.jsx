@@ -69,12 +69,12 @@ const Login = () => {
         };
 
         const targetRoute = roleRoutes[user.role] || "/dashboard";
-        console.log("🚀 Navigating to:", targetRoute);
+        console.log(" Navigating to:", targetRoute);
 
         navigate(targetRoute, { replace: true });
       }
     } catch (err) {
-      console.error("❌ Login error:", err);
+      console.error(" Login error:", err);
       if (err.message && err.message.toLowerCase().includes("disabled")) {
         setError(
           "Tài khoản của bạn chưa được kích hoạt. Vui lòng liên hệ quản trị viên hoặc chờ phê duyệt.",
