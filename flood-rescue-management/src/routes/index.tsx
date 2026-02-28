@@ -29,13 +29,13 @@ import RequestsManagement from "../pages/coordinator/RequestsManagement";
 import TeamCoordination from "../pages/coordinator/TeamCoordination";
 
 // Manager pages
-import ManagerDashboard from "../pages/manager/Dashboard";
+import ManagerDashboard from "../pages/Manager/ManagerDashboard";
 import VehicleManagement from "../pages/manager/VehicleManagement";
 import InventoryManagement from "../pages/manager/InventoryManagement";
 import DistributionTracking from "../pages/manager/DistributionTracking";
 
 // Admin pages
-import AdminDashboard from "../pages/admin/Dashboard";
+import AdminDashboard from "../pages/Admin/AdminDashboard";
 import UserManagement from "../pages/admin/UserManagement";
 import SystemConfig from "../pages/admin/SystemConfig";
 import Reports from "../pages/admin/Reports";

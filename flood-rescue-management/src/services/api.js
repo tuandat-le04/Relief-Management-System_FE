@@ -12,7 +12,9 @@ const api = axios.create({
 // Request interceptor - Thêm token vào mỗi request
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("accessToken");
+    // Ưu tiên accessToken, fallback sang token do authService lưu
+    const token =
+      localStorage.getItem("accessToken") || localStorage.getItem("token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -36,7 +38,8 @@ api.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        const refreshToken = localStorage.getItem("refreshToken");
+        const refreshToken =
+          localStorage.getItem("refreshToken") || localStorage.getItem("refresh_token");
         // TODO: Implement refresh token API nếu backend có
         // const response = await axios.post('/auth/refresh', { refreshToken });
         // localStorage.setItem('accessToken', response.data.token);
@@ -44,6 +47,7 @@ api.interceptors.response.use(
 
         // Nếu không có refresh token API, logout user
         localStorage.removeItem("accessToken");
+        localStorage.removeItem("token");
         localStorage.removeItem("refreshToken");
         localStorage.removeItem("user");
         window.location.href = "/login";

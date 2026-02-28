@@ -3,9 +3,11 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Login from './pages/Login';
 import Register from './pages/Register';
 import CitizenDashboard from './pages/citizen/Dashboard';
-import AdminDashboard from './pages/admin/Dashboard';
+import CitizenRescueRequest from './pages/Citizen/CitizenRescueRequest';
+import CitizenReliefRequest from './pages/Citizen/CitizenReliefRequest';
+import AdminDashboard from './pages/Admin/AdminDashboard';
 import CoordinatorDashboard from './pages/coordinator/Dashboard';
-import ManagerDashboard from './pages/manager/Dashboard';
+import ManagerDashboard from './pages/Manager/ManagerDashboard';
 
 function App() {
   return (
@@ -14,6 +16,8 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/citizen/dashboard" element={<CitizenDashboard />} />
+        <Route path="/citizen/rescue-request" element={<CitizenRescueRequest />} />
+        <Route path="/citizen/relief-request" element={<CitizenReliefRequest />} />
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
         <Route path="/coordinator/dashboard" element={<CoordinatorDashboard />} />
         <Route path="/manager/dashboard" element={<ManagerDashboard />} />

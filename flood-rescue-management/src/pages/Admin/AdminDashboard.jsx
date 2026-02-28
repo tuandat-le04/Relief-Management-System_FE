@@ -1,11 +1,16 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import Sidebar from "../../components/admin/Sidebar";
 import avatarUser from "../../assets/images/avatar-user.png";
+import { usePermission } from "../../hooks/usePermission";
+import { Permission } from "../../constants/permissions";
+import { Role } from "../../constants/roles";
 import {
   People,
   CheckCircle,
   HourglassEmpty,
   Lock,
+  Lock as LockIcon,
   ChevronRight,
   Add,
   Search,
@@ -21,10 +26,63 @@ import {
 } from "@mui/icons-material";
 
 export default function AdminDashboard() {
+  const navigate = useNavigate();
+  const {
+    hasPermission,
+    hasRole,
+    userRole,
+    isAuthenticated,
+  } = usePermission();
+
+  // Kiểm tra quyền truy cập - chỉ Admin mới được truy cập
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate("/login");
+      return;
+    }
+
+    if (!hasRole(Role.ADMIN)) {
+      navigate("/unauthorized");
+      return;
+    }
+  }, [isAuthenticated, hasRole, navigate]);
+
+  // Kiểm tra các quyền cụ thể cho Admin
+  const canManageUsers = hasPermission(Permission.MANAGE_USERS);
+  const canManageRoles = hasPermission(Permission.MANAGE_ROLES);
+  const canSystemConfig = hasPermission(Permission.SYSTEM_CONFIG);
+  const canViewAllReports = hasPermission(Permission.VIEW_ALL_REPORTS);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [viewMode, setViewMode] = useState("table"); // table or grid
+
+  // Loading state khi đang kiểm tra quyền
+  if (!isAuthenticated || !hasRole(Role.ADMIN)) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-50 via-emerald-50/30 to-teal-50/20">
+        <div className="text-center p-8 bg-white rounded-3xl shadow-xl border border-gray-200">
+          <LockIcon sx={{ fontSize: 48 }} className="text-red-500 mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            Không có quyền truy cập
+          </h2>
+          <p className="text-gray-600 mb-4">
+            Bạn không có quyền truy cập vào trang quản trị.
+          </p>
+          <p className="text-sm text-gray-500 mb-4">
+            Vai trò của bạn: {userRole || "Chưa xác định"}
+          </p>
+          <button
+            onClick={() => navigate("/")}
+            className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-colors"
+          >
+            Quay lại trang chủ
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // Statistics data
   const stats = [
@@ -184,6 +242,7 @@ export default function AdminDashboard() {
                   động của các đội cứu trợ
                 </p>
               </div>
+              {canManageUsers && (
               <button className="flex items-center justify-center gap-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-teal-600 hover:to-emerald-500 text-white px-6 py-3 rounded-xl shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 transition-all duration-300 font-semibold text-sm whitespace-nowrap group hover:scale-105">
                 <Add
                   sx={{ fontSize: 20 }}
@@ -191,6 +250,7 @@ export default function AdminDashboard() {
                 />
                 <span>Thêm người dùng</span>
               </button>
+              )}
             </div>
 
             {/* Statistics Cards */}
@@ -325,6 +385,7 @@ export default function AdminDashboard() {
                 </div>
 
                 {/* Export Button */}
+                {canViewAllReports && (
                 <button
                   className="flex items-center justify-center gap-2 px-4 h-[48px] rounded-xl border border-gray-300 bg-white text-gray-600 hover:text-gray-900 hover:border-emerald-400 hover:bg-gray-50 transition-all shadow-sm hover:shadow-emerald-200/50"
                   title="Xuất dữ liệu"
@@ -334,6 +395,7 @@ export default function AdminDashboard() {
                     Xuất
                   </span>
                 </button>
+                )}
               </div>
             </div>
           </div>
@@ -465,12 +527,16 @@ export default function AdminDashboard() {
                         </td>
                         <td className="py-5 px-6 text-right">
                           <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-200">
+                            {canManageRoles && (
                             <button
                               className="p-2.5 text-gray-500 hover:text-purple-600 hover:bg-purple-100 rounded-xl transition-all hover:scale-110 hover:shadow-lg"
                               title="Phân quyền"
                             >
                               <VpnKey sx={{ fontSize: 20 }} />
                             </button>
+                            )}
+                            {canManageUsers && (
+                            <>
                             <button
                               className="p-2.5 text-gray-500 hover:text-emerald-600 hover:bg-emerald-100 rounded-xl transition-all hover:scale-110 hover:shadow-lg"
                               title="Chỉnh sửa"
@@ -491,6 +557,8 @@ export default function AdminDashboard() {
                               >
                                 <Lock sx={{ fontSize: 20 }} />
                               </button>
+                            )}
+                            </>
                             )}
                           </div>
                         </td>
@@ -558,12 +626,14 @@ export default function AdminDashboard() {
       </main>
 
       {/* Quick Action Button (Floating) */}
+      {canManageUsers && (
       <button className="fixed bottom-6 right-6 z-50 p-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-teal-600 hover:to-emerald-500 text-white rounded-2xl shadow-2xl shadow-emerald-300/50 hover:shadow-emerald-400/60 transition-all duration-300 hover:scale-110 group">
         <Add
           sx={{ fontSize: 24 }}
           className="group-hover:rotate-90 transition-transform duration-300"
         />
       </button>
+      )}
     </div>
   );
 }
