@@ -1,6 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import Sidebar from "../../components/manager/Sidebar";
 import Notification from "../../components/manager/Notification";
+import { usePermission } from "../../hooks/usePermission";
+import { Permission } from "../../constants/permissions";
+import { Role } from "../../constants/roles";
 import {
   Warning as WarningIcon,
   LocalShipping as VehicleIcon,
@@ -27,11 +31,65 @@ import {
   Schedule as ScheduleIcon,
   CheckCircle as CheckCircleIcon,
   ErrorOutline as ErrorOutlineIcon,
+  Lock as LockIcon,
 } from "@mui/icons-material";
 
 export default function ManagerDashboard() {
+  const navigate = useNavigate();
+  const {
+    hasPermission,
+    hasRole,
+    userRole,
+    isAuthenticated,
+  } = usePermission();
+
+  // Kiểm tra quyền truy cập - chỉ Manager và Admin mới được truy cập
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate("/login");
+      return;
+    }
+
+    if (!hasRole([Role.MANAGER, Role.ADMIN])) {
+      navigate("/unauthorized");
+      return;
+    }
+  }, [isAuthenticated, hasRole, navigate]);
+
+  // Kiểm tra các quyền cụ thể cho Manager
+  const canManageVehicles = hasPermission(Permission.MANAGE_VEHICLES);
+  const canManageInventory = hasPermission(Permission.MANAGE_INVENTORY);
+  const canTrackDistributions = hasPermission(Permission.TRACK_DISTRIBUTIONS);
+  const canViewReports = hasPermission(Permission.VIEW_RESOURCE_REPORTS);
+
   const [selectedTimeframe, setSelectedTimeframe] = useState("today");
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+
+  // Loading state khi đang kiểm tra quyền
+  if (!isAuthenticated || !hasRole([Role.MANAGER, Role.ADMIN])) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
+        <div className="text-center p-8 bg-white rounded-3xl shadow-xl border border-slate-200">
+          <LockIcon sx={{ fontSize: 48 }} className="text-red-500 mb-4" />
+          <h2 className="text-2xl font-bold text-slate-900 mb-2">
+            Không có quyền truy cập
+          </h2>
+          <p className="text-slate-600 mb-4">
+            Bạn không có quyền truy cập vào trang này.
+          </p>
+          <p className="text-sm text-slate-500 mb-4">
+            Vai trò của bạn: {userRole || "Chưa xác định"}
+          </p>
+          <button
+            onClick={() => navigate("/")}
+            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-colors"
+          >
+            Quay lại trang chủ
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // Alerts data
   const [alerts] = useState([
@@ -463,6 +521,7 @@ export default function ManagerDashboard() {
 
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
             {/* Vehicle Management - Modern Design */}
+            {canManageVehicles ? (
             <div className="xl:col-span-2 bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden">
               <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-transparent">
                 <div className="flex items-center justify-between mb-4">
@@ -625,8 +684,22 @@ export default function ManagerDashboard() {
                 </table>
               </div>
             </div>
+            ) : (
+              <div className="xl:col-span-2 bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden p-12">
+                <div className="text-center">
+                  <LockIcon sx={{ fontSize: 48 }} className="text-slate-300 mb-4" />
+                  <h3 className="text-xl font-bold text-slate-700 mb-2">
+                    Không có quyền truy cập
+                  </h3>
+                  <p className="text-slate-500">
+                    Bạn không có quyền quản lý phương tiện.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Distribution Tracking - Modern Design */}
+            {canTrackDistributions ? (
             <div className="bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden">
               <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-transparent">
                 <div className="flex items-center justify-between">
@@ -707,8 +780,22 @@ export default function ManagerDashboard() {
                 })}
               </div>
             </div>
+            ) : (
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden p-12">
+                <div className="text-center">
+                  <LockIcon sx={{ fontSize: 48 }} className="text-slate-300 mb-4" />
+                  <h3 className="text-xl font-bold text-slate-700 mb-2">
+                    Không có quyền truy cập
+                  </h3>
+                  <p className="text-slate-500">
+                    Bạn không có quyền theo dõi phân phối.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Inventory Management - Modern Design */}
+            {canManageInventory ? (
             <div className="xl:col-span-3 bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden">
               <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-transparent">
                 <div className="flex items-center justify-between">
@@ -738,10 +825,12 @@ export default function ManagerDashboard() {
                         className="pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                       />
                     </div>
-                    <button className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-semibold transition-colors">
-                      <DownloadIcon sx={{ fontSize: 18 }} />
-                      <span>Xuất báo cáo</span>
-                    </button>
+                    {canViewReports && (
+                      <button className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-semibold transition-colors">
+                        <DownloadIcon sx={{ fontSize: 18 }} />
+                        <span>Xuất báo cáo</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -839,6 +928,19 @@ export default function ManagerDashboard() {
                 </table>
               </div>
             </div>
+            ) : (
+              <div className="xl:col-span-3 bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden p-12">
+                <div className="text-center">
+                  <LockIcon sx={{ fontSize: 48 }} className="text-slate-300 mb-4" />
+                  <h3 className="text-xl font-bold text-slate-700 mb-2">
+                    Không có quyền truy cập
+                  </h3>
+                  <p className="text-slate-500">
+                    Bạn không có quyền quản lý kho vật tư.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
