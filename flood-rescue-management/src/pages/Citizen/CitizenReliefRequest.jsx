@@ -1,9 +1,10 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import authService from "../../services/authService";
 import api from "../../services/api";
 
 export default function CitizenReliefRequest() {
+	const navigate = useNavigate();
 	const [form, setForm] = useState({
 		fullName: "",
 		phone: "",
@@ -70,6 +71,11 @@ export default function CitizenReliefRequest() {
 		} finally {
 			setIsSubmitting(false);
 		}
+	};
+
+	const handleLogout = () => {
+		authService.logout();
+		navigate("/login");
 	};
 
 	const handleAutoLocation = async () => {
@@ -176,15 +182,24 @@ export default function CitizenReliefRequest() {
 						</div>
 						<div className="flex items-center gap-3 border-l pl-6 border-gray-200 dark:border-gray-700">
 							{currentUser ? (
-								<button className="flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 p-1 pl-1 pr-3 rounded-full transition-all border border-transparent hover:border-gray-200 dark:hover:border-gray-700 group">
-									<div className="size-8 bg-gray-200 rounded-full overflow-hidden ring-2 ring-white dark:ring-gray-800 shadow-sm group-hover:ring-primary/20 transition-all">
-										<img alt="User Avatar" className="w-full h-full object-cover" src={avatarUrl} />
-									</div>
-									<div className="text-left hidden lg:block">
-										<p className="text-xs font-bold text-gray-900 dark:text-gray-100 leading-tight">{displayName}</p>
-										<p className="text-[10px] text-gray-500 font-medium">{roleLabel}</p>
-									</div>
-								</button>
+								<>
+									<button className="flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 p-1 pl-1 pr-3 rounded-full transition-all border border-transparent hover:border-gray-200 dark:hover:border-gray-700 group">
+										<div className="size-8 bg-gray-200 rounded-full overflow-hidden ring-2 ring-white dark:ring-gray-800 shadow-sm group-hover:ring-primary/20 transition-all">
+											<img alt="User Avatar" className="w-full h-full object-cover" src={avatarUrl} />
+										</div>
+										<div className="text-left hidden lg:block">
+											<p className="text-xs font-bold text-gray-900 dark:text-gray-100 leading-tight">{displayName}</p>
+											<p className="text-[10px] text-gray-500 font-medium">{roleLabel}</p>
+										</div>
+									</button>
+									<button
+										type="button"
+										onClick={handleLogout}
+										className="text-xs font-semibold text-red-600 hover:text-red-700 whitespace-nowrap ml-2"
+									>
+										Đăng xuất
+									</button>
+								</>
 							) : (
 								<Link
 									to="/login"
