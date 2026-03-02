@@ -36,12 +36,7 @@ import {
 
 export default function ManagerDashboard() {
   const navigate = useNavigate();
-  const {
-    hasPermission,
-    hasRole,
-    userRole,
-    isAuthenticated,
-  } = usePermission();
+  const { hasPermission, hasRole, userRole, isAuthenticated } = usePermission();
 
   // Kiểm tra quyền truy cập - chỉ Manager và Admin mới được truy cập
   useEffect(() => {
@@ -64,6 +59,13 @@ export default function ManagerDashboard() {
 
   const [selectedTimeframe, setSelectedTimeframe] = useState("today");
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    navigate("/login");
+  };
 
   // Loading state khi đang kiểm tra quyền
   if (!isAuthenticated || !hasRole([Role.MANAGER, Role.ADMIN])) {
@@ -438,6 +440,70 @@ export default function ManagerDashboard() {
                   />
                   <span>Làm mới</span>
                 </button>
+
+                {/* User Menu */}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowUserMenu(!showUserMenu)}
+                    className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full border-2 border-white shadow-md flex items-center justify-center overflow-hidden hover:ring-2 hover:ring-blue-400 transition-all"
+                  >
+                    <span className="text-white font-bold text-sm">MN</span>
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {showUserMenu && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-10"
+                        onClick={() => setShowUserMenu(false)}
+                      />
+                      <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-slate-200 py-2 z-20">
+                        <div className="px-4 py-3 border-b border-slate-200">
+                          <p className="text-sm font-bold text-slate-900">
+                            Manager
+                          </p>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            manager@reliefmanagement.vn
+                          </p>
+                        </div>
+
+                        <div className="py-2">
+                          <a
+                            href="#"
+                            className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                          >
+                            <span className="text-slate-500">👤</span>
+                            Hồ sơ cá nhân
+                          </a>
+                          <a
+                            href="#"
+                            className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                          >
+                            <span className="text-slate-500">⚙️</span>
+                            Cài đặt
+                          </a>
+                          <a
+                            href="#"
+                            className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                          >
+                            <span className="text-slate-500">❓</span>
+                            Trợ giúp
+                          </a>
+                        </div>
+
+                        <div className="border-t border-slate-200 pt-2">
+                          <button
+                            onClick={handleLogout}
+                            className="flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors w-full font-semibold"
+                          >
+                            <span className="text-red-500">🚪</span>
+                            Đăng xuất
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -522,172 +588,175 @@ export default function ManagerDashboard() {
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
             {/* Vehicle Management - Modern Design */}
             {canManageVehicles ? (
-            <div className="xl:col-span-2 bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden">
-              <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-transparent">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/20">
-                      <VehicleIcon sx={{ fontSize: 24 }} />
+              <div className="xl:col-span-2 bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden">
+                <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-transparent">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/20">
+                        <VehicleIcon sx={{ fontSize: 24 }} />
+                      </div>
+                      <div>
+                        <h2 className="text-xl font-bold text-slate-900">
+                          Quản Lý Phương Tiện
+                        </h2>
+                        <p className="text-sm text-slate-600 mt-0.5">
+                          Theo dõi và giám sát tất cả xe cứu hộ
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h2 className="text-xl font-bold text-slate-900">
-                        Quản Lý Phương Tiện
-                      </h2>
-                      <p className="text-sm text-slate-600 mt-0.5">
-                        Theo dõi và giám sát tất cả xe cứu hộ
-                      </p>
-                    </div>
-                  </div>
 
-                  <div className="flex items-center gap-2">
-                    <button className="p-2.5 hover:bg-slate-100 rounded-xl transition-colors">
-                      <FilterIcon
-                        sx={{ fontSize: 20 }}
-                        className="text-slate-600"
-                      />
-                    </button>
-                    <button className="p-2.5 hover:bg-slate-100 rounded-xl transition-colors">
-                      <MoreIcon
-                        sx={{ fontSize: 20 }}
-                        className="text-slate-600"
-                      />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button className="p-2.5 hover:bg-slate-100 rounded-xl transition-colors">
+                        <FilterIcon
+                          sx={{ fontSize: 20 }}
+                          className="text-slate-600"
+                        />
+                      </button>
+                      <button className="p-2.5 hover:bg-slate-100 rounded-xl transition-colors">
+                        <MoreIcon
+                          sx={{ fontSize: 20 }}
+                          className="text-slate-600"
+                        />
+                      </button>
+                    </div>
                   </div>
                 </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-slate-50/50">
+                        <th className="px-6 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">
+                          Phương Tiện
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">
+                          Trạng Thái
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">
+                          Vị Trí
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">
+                          Nhiên Liệu
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {vehicles.map((vehicle, idx) => {
+                        const status = getVehicleStatusBadge(vehicle.status);
+                        return (
+                          <tr
+                            key={vehicle.id}
+                            className={`border-b border-slate-100 hover:bg-slate-50/50 transition-colors ${
+                              idx === vehicles.length - 1 ? "border-b-0" : ""
+                            }`}
+                          >
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
+                                  {vehicle.type === "Xe tải" ? (
+                                    <VehicleIcon
+                                      sx={{ fontSize: 20 }}
+                                      className="text-slate-600"
+                                    />
+                                  ) : vehicle.type === "Cano" ? (
+                                    <ShipIcon
+                                      sx={{ fontSize: 20 }}
+                                      className="text-slate-600"
+                                    />
+                                  ) : (
+                                    <span className="text-sm font-bold text-slate-700">
+                                      {vehicle.id}
+                                    </span>
+                                  )}
+                                </div>
+                                <div>
+                                  <div className="text-sm font-bold text-slate-900">
+                                    {vehicle.name}
+                                  </div>
+                                  <div className="text-xs text-slate-500">
+                                    {vehicle.type} · {vehicle.driver}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span
+                                className={`inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-semibold ${status.style}`}
+                              >
+                                {status.label}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-2">
+                                <LocationIcon
+                                  sx={{ fontSize: 16 }}
+                                  className="text-slate-400"
+                                />
+                                <div>
+                                  <div className="text-sm font-medium text-slate-900">
+                                    {vehicle.location}
+                                  </div>
+                                  <div className="flex items-center gap-1 text-xs text-slate-500">
+                                    <SpeedIcon sx={{ fontSize: 12 }} />
+                                    <span>{vehicle.distance}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-3">
+                                <div className="flex-1">
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span
+                                      className={`text-xs font-bold ${
+                                        vehicle.fuel < 30
+                                          ? "text-red-600"
+                                          : vehicle.fuel < 50
+                                            ? "text-amber-600"
+                                            : "text-emerald-600"
+                                      }`}
+                                    >
+                                      {vehicle.fuel}%
+                                    </span>
+                                  </div>
+                                  <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                                    <div
+                                      className={`h-full rounded-full transition-all duration-500 ${
+                                        vehicle.fuel < 30
+                                          ? "bg-gradient-to-r from-red-500 to-red-600"
+                                          : vehicle.fuel < 50
+                                            ? "bg-gradient-to-r from-amber-500 to-amber-600"
+                                            : "bg-gradient-to-r from-emerald-500 to-emerald-600"
+                                      }`}
+                                      style={{ width: `${vehicle.fuel}%` }}
+                                    ></div>
+                                  </div>
+                                </div>
+                                <FuelIcon
+                                  sx={{ fontSize: 18 }}
+                                  className={
+                                    vehicle.fuel < 30
+                                      ? "text-red-500"
+                                      : vehicle.fuel < 50
+                                        ? "text-amber-500"
+                                        : "text-emerald-500"
+                                  }
+                                />
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-slate-50/50">
-                      <th className="px-6 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">
-                        Phương Tiện
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">
-                        Trạng Thái
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">
-                        Vị Trí
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">
-                        Nhiên Liệu
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {vehicles.map((vehicle, idx) => {
-                      const status = getVehicleStatusBadge(vehicle.status);
-                      return (
-                        <tr
-                          key={vehicle.id}
-                          className={`border-b border-slate-100 hover:bg-slate-50/50 transition-colors ${
-                            idx === vehicles.length - 1 ? "border-b-0" : ""
-                          }`}
-                        >
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
-                                {vehicle.type === "Xe tải" ? (
-                                  <VehicleIcon
-                                    sx={{ fontSize: 20 }}
-                                    className="text-slate-600"
-                                  />
-                                ) : vehicle.type === "Cano" ? (
-                                  <ShipIcon
-                                    sx={{ fontSize: 20 }}
-                                    className="text-slate-600"
-                                  />
-                                ) : (
-                                  <span className="text-sm font-bold text-slate-700">
-                                    {vehicle.id}
-                                  </span>
-                                )}
-                              </div>
-                              <div>
-                                <div className="text-sm font-bold text-slate-900">
-                                  {vehicle.name}
-                                </div>
-                                <div className="text-xs text-slate-500">
-                                  {vehicle.type} · {vehicle.driver}
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <span
-                              className={`inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-semibold ${status.style}`}
-                            >
-                              {status.label}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-2">
-                              <LocationIcon
-                                sx={{ fontSize: 16 }}
-                                className="text-slate-400"
-                              />
-                              <div>
-                                <div className="text-sm font-medium text-slate-900">
-                                  {vehicle.location}
-                                </div>
-                                <div className="flex items-center gap-1 text-xs text-slate-500">
-                                  <SpeedIcon sx={{ fontSize: 12 }} />
-                                  <span>{vehicle.distance}</span>
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-3">
-                              <div className="flex-1">
-                                <div className="flex items-center justify-between mb-1">
-                                  <span
-                                    className={`text-xs font-bold ${
-                                      vehicle.fuel < 30
-                                        ? "text-red-600"
-                                        : vehicle.fuel < 50
-                                          ? "text-amber-600"
-                                          : "text-emerald-600"
-                                    }`}
-                                  >
-                                    {vehicle.fuel}%
-                                  </span>
-                                </div>
-                                <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                                  <div
-                                    className={`h-full rounded-full transition-all duration-500 ${
-                                      vehicle.fuel < 30
-                                        ? "bg-gradient-to-r from-red-500 to-red-600"
-                                        : vehicle.fuel < 50
-                                          ? "bg-gradient-to-r from-amber-500 to-amber-600"
-                                          : "bg-gradient-to-r from-emerald-500 to-emerald-600"
-                                    }`}
-                                    style={{ width: `${vehicle.fuel}%` }}
-                                  ></div>
-                                </div>
-                              </div>
-                              <FuelIcon
-                                sx={{ fontSize: 18 }}
-                                className={
-                                  vehicle.fuel < 30
-                                    ? "text-red-500"
-                                    : vehicle.fuel < 50
-                                      ? "text-amber-500"
-                                      : "text-emerald-500"
-                                }
-                              />
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
             ) : (
               <div className="xl:col-span-2 bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden p-12">
                 <div className="text-center">
-                  <LockIcon sx={{ fontSize: 48 }} className="text-slate-300 mb-4" />
+                  <LockIcon
+                    sx={{ fontSize: 48 }}
+                    className="text-slate-300 mb-4"
+                  />
                   <h3 className="text-xl font-bold text-slate-700 mb-2">
                     Không có quyền truy cập
                   </h3>
@@ -700,90 +769,93 @@ export default function ManagerDashboard() {
 
             {/* Distribution Tracking - Modern Design */}
             {canTrackDistributions ? (
-            <div className="bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden">
-              <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-transparent">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-3 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 text-white shadow-lg shadow-purple-500/20">
-                      <ShipIcon sx={{ fontSize: 24 }} />
-                    </div>
-                    <div>
-                      <h2 className="text-xl font-bold text-slate-900">
-                        Phân Phối
-                      </h2>
-                      <p className="text-sm text-slate-600 mt-0.5">
-                        Theo dõi phân bổ nguồn lực
-                      </p>
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden">
+                <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-transparent">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-3 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 text-white shadow-lg shadow-purple-500/20">
+                        <ShipIcon sx={{ fontSize: 24 }} />
+                      </div>
+                      <div>
+                        <h2 className="text-xl font-bold text-slate-900">
+                          Phân Phối
+                        </h2>
+                        <p className="text-sm text-slate-600 mt-0.5">
+                          Theo dõi phân bổ nguồn lực
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="p-6 space-y-4 max-h-[500px] overflow-y-auto">
-                {distributions.map((dist) => {
-                  const status = getDistributionStatusBadge(dist.status);
-                  return (
-                    <div
-                      key={dist.id}
-                      className="group p-5 rounded-2xl border-2 border-slate-100 hover:border-blue-200 bg-slate-50/50 hover:bg-blue-50/50 transition-all duration-300"
-                    >
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <h3 className="text-base font-bold text-slate-900 mb-1">
-                            {dist.area}
-                          </h3>
-                          <p className="text-xs text-slate-600 mb-2">
-                            {dist.items}
-                          </p>
-                          <div className="flex items-center gap-2 text-xs text-slate-500">
-                            <span className="font-medium">{dist.team}</span>
-                            <span>•</span>
-                            <span>{dist.people} người</span>
+                <div className="p-6 space-y-4 max-h-[500px] overflow-y-auto">
+                  {distributions.map((dist) => {
+                    const status = getDistributionStatusBadge(dist.status);
+                    return (
+                      <div
+                        key={dist.id}
+                        className="group p-5 rounded-2xl border-2 border-slate-100 hover:border-blue-200 bg-slate-50/50 hover:bg-blue-50/50 transition-all duration-300"
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1">
+                            <h3 className="text-base font-bold text-slate-900 mb-1">
+                              {dist.area}
+                            </h3>
+                            <p className="text-xs text-slate-600 mb-2">
+                              {dist.items}
+                            </p>
+                            <div className="flex items-center gap-2 text-xs text-slate-500">
+                              <span className="font-medium">{dist.team}</span>
+                              <span>•</span>
+                              <span>{dist.people} người</span>
+                            </div>
                           </div>
+                          <span
+                            className={`inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-bold ${status.style}`}
+                          >
+                            {status.label}
+                          </span>
                         </div>
-                        <span
-                          className={`inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-bold ${status.style}`}
-                        >
-                          {status.label}
-                        </span>
-                      </div>
 
-                      {dist.status !== "pending" && (
-                        <div className="mt-3">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-semibold text-slate-600">
-                              Tiến độ
-                            </span>
-                            <span className="text-xs font-bold text-slate-900">
-                              {dist.progress}%
-                            </span>
+                        {dist.status !== "pending" && (
+                          <div className="mt-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-xs font-semibold text-slate-600">
+                                Tiến độ
+                              </span>
+                              <span className="text-xs font-bold text-slate-900">
+                                {dist.progress}%
+                              </span>
+                            </div>
+                            <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full transition-all duration-700"
+                                style={{ width: `${dist.progress}%` }}
+                              ></div>
+                            </div>
                           </div>
-                          <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full transition-all duration-700"
-                              style={{ width: `${dist.progress}%` }}
-                            ></div>
-                          </div>
+                        )}
+
+                        <div className="mt-3 pt-3 border-t border-slate-200 flex items-center justify-between">
+                          <span className="text-xs text-slate-500">
+                            {dist.timestamp}
+                          </span>
+                          <button className="text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors">
+                            Chi tiết →
+                          </button>
                         </div>
-                      )}
-
-                      <div className="mt-3 pt-3 border-t border-slate-200 flex items-center justify-between">
-                        <span className="text-xs text-slate-500">
-                          {dist.timestamp}
-                        </span>
-                        <button className="text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors">
-                          Chi tiết →
-                        </button>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
             ) : (
               <div className="bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden p-12">
                 <div className="text-center">
-                  <LockIcon sx={{ fontSize: 48 }} className="text-slate-300 mb-4" />
+                  <LockIcon
+                    sx={{ fontSize: 48 }}
+                    className="text-slate-300 mb-4"
+                  />
                   <h3 className="text-xl font-bold text-slate-700 mb-2">
                     Không có quyền truy cập
                   </h3>
@@ -796,142 +868,145 @@ export default function ManagerDashboard() {
 
             {/* Inventory Management - Modern Design */}
             {canManageInventory ? (
-            <div className="xl:col-span-3 bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden">
-              <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-transparent">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/20">
-                      <BoxIcon sx={{ fontSize: 24 }} />
+              <div className="xl:col-span-3 bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden">
+                <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-transparent">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/20">
+                        <BoxIcon sx={{ fontSize: 24 }} />
+                      </div>
+                      <div>
+                        <h2 className="text-xl font-bold text-slate-900">
+                          Quản Lý Kho Vật Tư
+                        </h2>
+                        <p className="text-sm text-slate-600 mt-0.5">
+                          Mức tồn kho và tình trạng kho hàng
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h2 className="text-xl font-bold text-slate-900">
-                        Quản Lý Kho Vật Tư
-                      </h2>
-                      <p className="text-sm text-slate-600 mt-0.5">
-                        Mức tồn kho và tình trạng kho hàng
-                      </p>
-                    </div>
-                  </div>
 
-                  <div className="flex items-center gap-3">
-                    <div className="relative">
-                      <SearchIcon
-                        sx={{ fontSize: 18 }}
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Tìm kiếm vật tư..."
-                        className="pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      />
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <SearchIcon
+                          sx={{ fontSize: 18 }}
+                          className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Tìm kiếm vật tư..."
+                          className="pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        />
+                      </div>
+                      {canViewReports && (
+                        <button className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-semibold transition-colors">
+                          <DownloadIcon sx={{ fontSize: 18 }} />
+                          <span>Xuất báo cáo</span>
+                        </button>
+                      )}
                     </div>
-                    {canViewReports && (
-                      <button className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-semibold transition-colors">
-                        <DownloadIcon sx={{ fontSize: 18 }} />
-                        <span>Xuất báo cáo</span>
-                      </button>
-                    )}
                   </div>
                 </div>
-              </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-slate-50/50">
-                      <th className="px-6 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">
-                        Vật Tư
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">
-                        Danh Mục
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">
-                        Số Lượng
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">
-                        Trạng Thái
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">
-                        Kho
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">
-                        Nhập Thêm
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {inventory.map((item, idx) => {
-                      const status = getInventoryStatusBadge(item.status);
-                      return (
-                        <tr
-                          key={item.id}
-                          className={`border-b border-slate-100 hover:bg-slate-50/50 transition-colors ${
-                            idx === inventory.length - 1 ? "border-b-0" : ""
-                          }`}
-                        >
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-3">
-                              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
-                                <BoxIcon
-                                  sx={{ fontSize: 20 }}
-                                  className="text-slate-600"
-                                />
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-slate-50/50">
+                        <th className="px-6 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">
+                          Vật Tư
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">
+                          Danh Mục
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">
+                          Số Lượng
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">
+                          Trạng Thái
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">
+                          Kho
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">
+                          Nhập Thêm
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {inventory.map((item, idx) => {
+                        const status = getInventoryStatusBadge(item.status);
+                        return (
+                          <tr
+                            key={item.id}
+                            className={`border-b border-slate-100 hover:bg-slate-50/50 transition-colors ${
+                              idx === inventory.length - 1 ? "border-b-0" : ""
+                            }`}
+                          >
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
+                                  <BoxIcon
+                                    sx={{ fontSize: 20 }}
+                                    className="text-slate-600"
+                                  />
+                                </div>
+                                <div className="text-sm font-bold text-slate-900">
+                                  {item.name}
+                                </div>
                               </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className="inline-flex items-center px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-semibold">
+                                {item.category}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4">
                               <div className="text-sm font-bold text-slate-900">
-                                {item.name}
+                                {item.quantity.toLocaleString()} {item.unit}
                               </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className="inline-flex items-center px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-semibold">
-                              {item.category}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="text-sm font-bold text-slate-900">
-                              {item.quantity.toLocaleString()} {item.unit}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <span
-                              className={`inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-semibold ${status.style}`}
-                            >
-                              {status.label}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="text-sm font-medium text-slate-900">
-                              {item.warehouse}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <span
-                              className={`inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-semibold ${
-                                item.status === "critical"
-                                  ? "bg-red-100 text-red-700"
-                                  : item.status === "warning"
-                                    ? "bg-amber-100 text-amber-700"
-                                    : "bg-slate-100 text-slate-600"
-                              }`}
-                            >
-                              <ScheduleIcon
-                                sx={{ fontSize: 14 }}
-                                className="mr-1"
-                              />
-                              {item.restock}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span
+                                className={`inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-semibold ${status.style}`}
+                              >
+                                {status.label}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="text-sm font-medium text-slate-900">
+                                {item.warehouse}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span
+                                className={`inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-semibold ${
+                                  item.status === "critical"
+                                    ? "bg-red-100 text-red-700"
+                                    : item.status === "warning"
+                                      ? "bg-amber-100 text-amber-700"
+                                      : "bg-slate-100 text-slate-600"
+                                }`}
+                              >
+                                <ScheduleIcon
+                                  sx={{ fontSize: 14 }}
+                                  className="mr-1"
+                                />
+                                {item.restock}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
             ) : (
               <div className="xl:col-span-3 bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden p-12">
                 <div className="text-center">
-                  <LockIcon sx={{ fontSize: 48 }} className="text-slate-300 mb-4" />
+                  <LockIcon
+                    sx={{ fontSize: 48 }}
+                    className="text-slate-300 mb-4"
+                  />
                   <h3 className="text-xl font-bold text-slate-700 mb-2">
                     Không có quyền truy cập
                   </h3>
