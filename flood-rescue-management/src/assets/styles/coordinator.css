@@ -1,0 +1,58 @@
+/* Google Material Symbols */
+@import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200");
+
+/* Custom scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Material Icons styling */
+.material-symbols-outlined {
+  font-variation-settings:
+    "FILL" 0,
+    "wght" 400,
+    "GRAD" 0,
+    "opsz" 24;
+}
+
+/* Pulse animation for emergency markers */
+@keyframes pulse-emergency {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 15px rgba(220, 38, 38, 0);
+  }
+}
+
+.marker-emergency {
+  animation: pulse-emergency 2s infinite;
+}
+
+/* Goong Map custom styles */
+.goongjs-popup {
+  max-width: 250px;
+}
+
+.goongjs-popup-content {
+  padding: 12px;
+  border-radius: 8px;
+}
+
+.goongjs-ctrl-group button {
+  border-radius: 4px;
+}

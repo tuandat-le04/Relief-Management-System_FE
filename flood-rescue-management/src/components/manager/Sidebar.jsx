@@ -1,8 +1,17 @@
-import React from "react";
-import { Link, useLocation } from "react-router-dom";
+import React, { useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 export default function Sidebar() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const [showUserMenu, setShowUserMenu] = useState(false);
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    navigate("/login");
+  };
+
   return (
     <aside className="w-72 bg-gradient-to-b from-white to-gray-50 border-r border-gray-200 flex flex-col shrink-0 shadow-2xl">
       {/* Header Section */}
@@ -125,9 +134,12 @@ export default function Sidebar() {
         </nav>
       </div>
 
-      {/* User Profile Section */}
-      <div className="mt-auto p-4 border-t border-gray-200 bg-white/80 backdrop-blur-sm">
-        <div className="group flex items-center gap-3 p-3 rounded-xl hover:bg-gray-100 cursor-pointer transition-all duration-300 border border-transparent hover:border-gray-200 hover:shadow-lg">
+      {/* User Menu Section */}
+      <div className="mt-auto p-4 border-t border-gray-200 bg-white/80 backdrop-blur-sm relative">
+        <button
+          onClick={() => setShowUserMenu(!showUserMenu)}
+          className="group flex items-center gap-3 p-3 rounded-xl hover:bg-gray-100 cursor-pointer transition-all duration-300 border border-transparent hover:border-gray-200 hover:shadow-lg w-full"
+        >
           <div className="relative">
             <div
               className="bg-center bg-no-repeat bg-cover rounded-full w-11 h-11 border-2 border-blue-300 shadow-lg group-hover:border-blue-500 transition-all duration-300 group-hover:scale-105"
@@ -138,22 +150,102 @@ export default function Sidebar() {
             ></div>
             <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full shadow-lg shadow-green-500/50 animate-pulse"></div>
           </div>
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 overflow-hidden text-left">
             <p className="text-gray-800 text-sm font-semibold truncate group-hover:text-blue-600 transition-colors">
               Quản lý Cứu Trợ
             </p>
             <p className="text-gray-600 text-xs truncate font-medium">
-              Khu vực Miền Trung
+              manager@reliefops.vn
             </p>
           </div>
           <svg
-            className="w-5 h-5 text-gray-500 group-hover:text-blue-600 transition-all duration-300 group-hover:translate-x-1"
+            className={`w-5 h-5 text-gray-500 group-hover:text-blue-600 transition-all duration-300 ${
+              showUserMenu ? "rotate-90" : ""
+            }`}
             fill="currentColor"
             viewBox="0 0 24 24"
           >
-            <path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z" />
+            <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z" />
           </svg>
-        </div>
+        </button>
+
+        {/* Dropdown Menu */}
+        {showUserMenu && (
+          <>
+            <div
+              className="fixed inset-0 z-30"
+              onClick={() => setShowUserMenu(false)}
+            />
+            <div className="absolute bottom-full left-4 right-4 mb-2 bg-white rounded-2xl shadow-2xl border border-gray-200 py-2 z-40">
+              <div className="px-4 py-3 border-b border-gray-200">
+                <p className="text-sm font-bold text-gray-900">
+                  Manager - Quản lý Cứu Trợ
+                </p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Khu vực Miền Trung
+                </p>
+              </div>
+
+              <div className="py-2">
+                <a
+                  href="#"
+                  className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                  </svg>
+                  Hồ sơ cá nhân
+                </a>
+                <a
+                  href="#"
+                  className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94L14.4 2.81c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z" />
+                  </svg>
+                  Cài đặt
+                </a>
+                <a
+                  href="#"
+                  className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
+                  </svg>
+                  Trợ giúp
+                </a>
+              </div>
+
+              <div className="border-t border-gray-200 pt-2">
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors w-full font-semibold"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z" />
+                  </svg>
+                  Đăng xuất
+                </button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </aside>
   );
