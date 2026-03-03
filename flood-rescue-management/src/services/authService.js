@@ -90,48 +90,62 @@ const authService = {
     try {
       console.log("📤 Sending real login request:", credentials);
       const response = await api.post('/auth/login', credentials);
-      
-      console.log("📦 API Response:", response.data);
-      
+
+      console.log("📦 Login API Response:", response.data);
+
       if (!response.data) {
         throw new Error("No data received from server");
       }
 
-      // Parse response - Handle different structures
+      // Lấy token từ nhiều cấu trúc response khác nhau
+      let token =
+        response.data.token ||
+        response.data.accessToken ||
+        (response.data.data && (response.data.data.token || response.data.data.accessToken));
+
+      if (!token) {
+        throw new Error("Không nhận được token từ server");
+      }
+
+      // Lưu token trước để gọi được /auth/profile
+      localStorage.setItem('token', token);
+      console.log("💾 Token saved");
+
+      // Thử gọi API lấy profile để có đủ fullName, phone, v.v.
       let userData = null;
-      let token = null;
+      try {
+        const profileResponse = await api.get('/auth/profile');
+        console.log("📦 Profile API Response:", profileResponse.data);
 
-      // Check different response structures
-      if (response.data.user) {
-        userData = response.data.user;
-        token = response.data.token;
-      } else if (response.data.data) {
-        userData = response.data.data.user || response.data.data;
-        token = response.data.data.token || response.data.token;
-      } else if (response.data.role) {
-        // User data directly in response
-        userData = response.data;
-        token = response.data.token;
+        // Thường backend sẽ bọc trong data, nếu không thì lấy trực tiếp
+        userData = profileResponse.data?.data || profileResponse.data || null;
+      } catch (profileError) {
+        console.error("🔥 Profile fetch error:", profileError);
+
+        // Nếu gọi profile lỗi, fallback lại các field từ response login cũ
+        if (response.data.user) {
+          userData = response.data.user;
+        } else if (response.data.data) {
+          userData = response.data.data.user || response.data.data;
+        } else if (response.data.role) {
+          userData = response.data;
+        } else {
+          userData = null;
+        }
       }
 
-      // Save token
-      if (token) {
-        localStorage.setItem('token', token);
-        console.log("💾 Token saved");
-      }
-      
-      // Save user
-      if (userData) {
-        localStorage.setItem('user', JSON.stringify(userData));
-        console.log("💾 User saved:", userData);
-      } else {
+      if (!userData) {
         throw new Error("No user data in response");
       }
-      
-      return { 
-        success: true, 
+
+      // Lưu user vào localStorage
+      localStorage.setItem('user', JSON.stringify(userData));
+      console.log("💾 User saved:", userData);
+
+      return {
+        success: true,
         user: userData,
-        token: token
+        token: token,
       };
     } catch (error) {
       console.error("🔥 Login error:", error);

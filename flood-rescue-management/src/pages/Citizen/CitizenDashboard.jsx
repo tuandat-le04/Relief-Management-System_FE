@@ -12,7 +12,8 @@ const CitizenDashboard = () => {
   });
 
   const currentUser = authService.getCurrentUser();
-  const displayName = currentUser?.name || "Test Citizen";
+  const displayName =
+    currentUser?.fullName || currentUser?.username || currentUser?.name || "Người dùng";
   const avatarUrl =
     currentUser?.avatar ||
     "https://lh3.googleusercontent.com/aida-public/AB6AXuC5tF_1eIvvrD83eWRAoe-3d96B0aXaXs0jqAWxqyswKI8LBiqyVvXHOnhHzw7Lo0qP_mmp2JQP3ThRBAd0GohkAV439UpMYlBTQbLcWRY3WSY9C2s9jILWHGFq-ZDjSsiagrlYlpzMYlzr6tn60wG23atqijkSQSWYuGpd0_vlJ47riljO8rivoPHnrBImgTd_4MZ8AKU-xUIEDckE7iwA8Y3sEa_Fpguo4ZwL_MDTXnAITVBYEaXXfxKQb098GdXmTcTnamZUeU0";
