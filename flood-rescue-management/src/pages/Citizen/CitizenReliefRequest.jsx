@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import authService from "../../services/authService";
 import api from "../../services/api";
+import CitizenMapGoong from "../../components/citizen/CitizenMapGoong";
 
 export default function CitizenReliefRequest() {
 	const navigate = useNavigate();
@@ -22,6 +23,7 @@ export default function CitizenReliefRequest() {
 	const [isLocating, setIsLocating] = useState(false);
 	const [coords, setCoords] = useState({ latitude: null, longitude: null });
 	const [isSubmitting, setIsSubmitting] = useState(false);
+	const [isMapOpen, setIsMapOpen] = useState(false);
 
 	const handleChange = (field) => (e) => {
 		setForm((prev) => ({ ...prev, [field]: e.target.value }));
@@ -32,6 +34,27 @@ export default function CitizenReliefRequest() {
 			...prev,
 			supplies: { ...prev.supplies, [key]: !prev.supplies[key] },
 		}));
+	};
+
+	const fillAddressFromCoords = async (latitude, longitude) => {
+		try {
+			const apiKey = import.meta.env.VITE_GOONG_GEOLOCATION_KEY;
+			if (!apiKey) {
+				console.warn("Thiếu VITE_GOONG_GEOLOCATION_KEY trong file .env");
+				return;
+			}
+
+			const url = `https://rsapi.goong.io/geocode?latlng=${latitude},${longitude}&api_key=${apiKey}`;
+			const res = await fetch(url);
+			const data = await res.json();
+
+			const address = data?.results?.[0]?.formatted_address;
+			if (address) {
+				setForm((prev) => ({ ...prev, address }));
+			}
+		} catch (error) {
+			console.error("Reverse geocode error", error);
+		}
 	};
 
 	const handleSubmit = async (e) => {
@@ -47,7 +70,7 @@ export default function CitizenReliefRequest() {
 				.join(", ");
 
 			const payload = {
-				userId: user?.id ?? null,
+				userId: user?.id ?? user?.userId ?? null,
 				phone: form.phone,
 				requestType: "RELIEF",
 				latitude: coords.latitude ?? 0,
@@ -58,7 +81,8 @@ export default function CitizenReliefRequest() {
 				requestMedia: null,
 			};
 
-			await api.post("/rescue-requests", payload);
+			// Gửi đúng endpoint /api/v1/rescue-requests/relief
+			await api.post("/rescue-requests/relief", payload);
 
 			alert("Yêu cầu nhu yếu phẩm đã được gửi thành công!");
 		} catch (error) {
@@ -93,24 +117,7 @@ export default function CitizenReliefRequest() {
 						const { latitude, longitude } = position.coords;
 
 						setCoords({ latitude, longitude });
-
-						const apiKey = import.meta.env.VITE_GOONG_GEOLOCATION_KEY;
-						if (!apiKey) {
-							alert("Thiếu VITE_GOONG_GEOLOCATION_KEY trong file .env");
-							setIsLocating(false);
-							return;
-						}
-
-						const url = `https://rsapi.goong.io/geocode?latlng=${latitude},${longitude}&api_key=${apiKey}`;
-						const res = await fetch(url);
-						const data = await res.json();
-
-						const address = data?.results?.[0]?.formatted_address;
-						if (address) {
-							setForm((prev) => ({ ...prev, address }));
-						} else {
-							alert("Không tìm được địa chỉ từ vị trí hiện tại.");
-						}
+						await fillAddressFromCoords(latitude, longitude);
 					} catch (error) {
 						console.error("Auto location error", error);
 						alert("Có lỗi khi lấy địa chỉ tự động.");
@@ -148,7 +155,8 @@ export default function CitizenReliefRequest() {
 	const progressPercent = (completedSteps / 3) * 100;
 
 	const currentUser = authService.getCurrentUser();
-	const displayName = currentUser?.name || "Test Citizen";
+	const displayName =
+		currentUser?.fullName || currentUser?.username || currentUser?.name || "Người dùng";
 	const roleLabel = currentUser?.role === "CITIZEN" ? "Người dân" : "Người dùng";
 	const avatarUrl =
 		currentUser?.avatar ||
@@ -290,37 +298,36 @@ export default function CitizenReliefRequest() {
 							<div className="p-6 space-y-6">
 								<div className="flex flex-col gap-2">
 									<label className="text-[#131416] dark:text-gray-200 text-lg font-bold">Địa chỉ chi tiết</label>
-										<div className="flex flex-col md:flex-row gap-4">
-											<input
-												className="flex-1 h-14 rounded-lg border-[#dee0e3] dark:border-gray-700 bg-white dark:bg-gray-800 text-lg focus:ring-0 focus:border-primary px-4"
-												placeholder="Xóm, thôn, xã, huyện, tỉnh..."
-												type="text"
-												value={form.address}
-												onChange={handleChange("address")}
-											/>
-											<button
-												type="button"
-												onClick={handleAutoLocation}
-												className="bg-primary/10 hover:bg-primary/20 text-primary h-14 px-6 rounded-lg font-bold flex items-center justify-center gap-2 transition-colors whitespace-nowrap border border-primary/20 disabled:opacity-60 disabled:cursor-not-allowed"
-												disabled={isLocating}
-											>
-												<span className="material-symbols-outlined">my_location</span>
-												{isLocating ? "Đang lấy vị trí..." : "Lấy vị trí tự động"}
-											</button>
+									<div className="flex flex-col md:flex-row gap-4">
+										<input
+											className="flex-1 h-14 rounded-lg border-[#dee0e3] dark:border-gray-700 bg-white dark:bg-gray-800 text-lg focus:ring-0 focus:border-primary px-4"
+											placeholder="Xóm, thôn, xã, huyện, tỉnh..."
+											type="text"
+											value={form.address}
+											onChange={handleChange("address")}
+										/>
+										<button
+											type="button"
+											onClick={handleAutoLocation}
+											className="bg-primary/10 hover:bg-primary/20 text-primary h-14 px-6 rounded-lg font-bold flex items-center justify-center gap-2 transition-colors whitespace-nowrap border border-primary/20 disabled:opacity-60 disabled:cursor-not-allowed"
+											disabled={isLocating}
+										>
+											<span className="material-symbols-outlined">my_location</span>
+											{isLocating ? "Đang lấy vị trí..." : "Lấy vị trí tự động"}
+										</button>
 									</div>
 								</div>
-								<div className="rounded-xl overflow-hidden border border-[#dee0e3] dark:border-gray-700 h-56 bg-gray-100 relative">
-									<img
-										alt="Bản đồ vị trí"
-										className="w-full h-full object-cover grayscale opacity-50"
-										src="https://lh3.googleusercontent.com/aida-public/AB6AXuDafCwO7PLh_lfW9GUq2yApm6tHdVUZcOXXrjc8hdtjiYtyzvyt3RraNVJMaoiQFREVrJubRlUUeXXewymy54RpjqiLXwQWnLY8dnmI52MHWFIJzfsDN8lfGedE01zWp-mZBetx0CZrv94a9-e0mQS-J7VAORu38dRig9FE7Nemqhp3bUEh19abvdKHctEoVP9jRnyfH6zWosvNMK_sb-F7hhnZbpKI9sCVinzFhGmZGIiqmUfpvKDuXE4-pLlkksu8ISehRb4bqqQ"
-									/>
-									<div className="absolute inset-0 flex items-center justify-center">
-										<div className="bg-white/95 dark:bg-black/90 px-6 py-3 rounded-full shadow-xl border border-primary/30 flex items-center gap-3">
-											<span className="material-symbols-outlined text-primary animate-bounce">location_on</span>
-											<span className="font-bold text-gray-800 dark:text-white">Chọn vị trí trên bản đồ</span>
+								<div className="rounded-xl overflow-hidden border border-[#dee0e3] dark:border-gray-700 h-48 bg-gray-100 relative">
+									<button
+										type="button"
+										onClick={() => setIsMapOpen(true)}
+										className="absolute inset-0 flex items-center justify-center bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors"
+									>
+										<div className="bg-white/90 dark:bg-black/80 px-4 py-2 rounded-full shadow-lg border border-primary/20 flex items-center gap-2">
+											<span className="material-symbols-outlined text-primary">location_on</span>
+											<span className="font-medium text-sm">Chọn vị trí trên bản đồ</span>
 										</div>
-									</div>
+									</button>
 								</div>
 							</div>
 						</section>
@@ -439,6 +446,58 @@ export default function CitizenReliefRequest() {
 						</div>
 					</div>
 				</form>
+
+				{isMapOpen && (
+					<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+						<div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-3xl h-[70vh] flex flex-col">
+							<div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800">
+								<h3 className="text-lg font-bold flex items-center gap-2">
+									<span className="material-symbols-outlined text-primary">map</span>
+									Chọn vị trí nhận hàng
+								</h3>
+								<button
+									type="button"
+									onClick={() => setIsMapOpen(false)}
+									className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
+								>
+									<span className="material-symbols-outlined">close</span>
+								</button>
+							</div>
+							<div className="flex-1">
+								<CitizenMapGoong
+									initialCoords={coords.latitude && coords.longitude ? coords : null}
+									onSelectLocation={async ({ latitude, longitude }) => {
+										setCoords({ latitude, longitude });
+										await fillAddressFromCoords(latitude, longitude);
+									}}
+								/>
+							</div>
+							<div className="px-6 py-4 border-t border-gray-200 dark:border-gray-800 flex items-center justify-between text-sm">
+								<div className="text-gray-600 dark:text-gray-300">
+									Tọa độ đã chọn: {coords.latitude && coords.longitude
+										? `${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`
+										: "Chưa chọn"}
+								</div>
+								<div className="flex gap-3">
+									<button
+										type="button"
+										onClick={() => setIsMapOpen(false)}
+										className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 text-sm font-medium"
+									>
+										Hủy
+									</button>
+									<button
+										type="button"
+										onClick={() => setIsMapOpen(false)}
+										className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-primary/90"
+									>
+										Xác nhận vị trí
+									</button>
+								</div>
+							</div>
+						</div>
+					</div>
+				)}
 
 				{/* Sidebar */}
 				<aside className="lg:col-span-4 space-y-6">

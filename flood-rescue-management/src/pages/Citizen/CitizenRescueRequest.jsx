@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import authService from "../../services/authService";
 import api from "../../services/api";
+import CitizenMapGoong from "../../components/citizen/CitizenMapGoong";
 
 export default function CitizenRescueRequest() {
   const navigate = useNavigate();
@@ -16,9 +17,11 @@ export default function CitizenRescueRequest() {
   const [coords, setCoords] = useState({ latitude: null, longitude: null });
   const [isLocating, setIsLocating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isMapOpen, setIsMapOpen] = useState(false);
 
   const currentUser = authService.getCurrentUser();
-  const displayName = currentUser?.name || "Test Citizen";
+  const displayName =
+    currentUser?.fullName || currentUser?.username || currentUser?.name || "Người dùng";
   const roleLabel = currentUser?.role === "CITIZEN" ? "Người dân" : "Người dùng";
   const avatarUrl =
     currentUser?.avatar ||
@@ -43,7 +46,7 @@ export default function CitizenRescueRequest() {
       const user = currentUser;
 
       const payload = {
-        userId: user?.id ?? null,
+        userId: user?.id ?? user?.userId ?? null,
         phone: formData.phone,
         requestType: "RESCUE",
         latitude: coords.latitude ?? 0,
@@ -54,7 +57,7 @@ export default function CitizenRescueRequest() {
         requestMedia: null,
       };
 
-      await api.post("/rescue-requests", payload);
+      await api.post("/rescue-requests/rescue", payload);
 
       alert("Yêu cầu cứu hộ đã được gửi thành công!");
       navigate("/citizen/dashboard");
@@ -70,6 +73,27 @@ export default function CitizenRescueRequest() {
     }
   };
 
+  const fillAddressFromCoords = async (latitude, longitude) => {
+    try {
+      const apiKey = import.meta.env.VITE_GOONG_GEOLOCATION_KEY;
+      if (!apiKey) {
+        console.warn("Thiếu VITE_GOONG_GEOLOCATION_KEY trong file .env");
+        return;
+      }
+
+      const url = `https://rsapi.goong.io/geocode?latlng=${latitude},${longitude}&api_key=${apiKey}`;
+      const res = await fetch(url);
+      const data = await res.json();
+
+      const address = data?.results?.[0]?.formatted_address;
+      if (address) {
+        setFormData((prev) => ({ ...prev, address }));
+      }
+    } catch (error) {
+      console.error("Reverse geocode error", error);
+    }
+  };
+
   const handleAutoLocation = async () => {
     try {
       if (!navigator.geolocation) {
@@ -79,30 +103,13 @@ export default function CitizenRescueRequest() {
 
       setIsLocating(true);
 
-      navigator.geolocation.getCurrentPosition(
+            navigator.geolocation.getCurrentPosition(
         async (position) => {
           try {
             const { latitude, longitude } = position.coords;
 
             setCoords({ latitude, longitude });
-
-            const apiKey = import.meta.env.VITE_GOONG_GEOLOCATION_KEY;
-            if (!apiKey) {
-              alert("Thiếu VITE_GOONG_GEOLOCATION_KEY trong file .env");
-              setIsLocating(false);
-              return;
-            }
-
-            const url = `https://rsapi.goong.io/geocode?latlng=${latitude},${longitude}&api_key=${apiKey}`;
-            const res = await fetch(url);
-            const data = await res.json();
-
-            const address = data?.results?.[0]?.formatted_address;
-            if (address) {
-              setFormData((prev) => ({ ...prev, address }));
-            } else {
-              alert("Không tìm được địa chỉ từ vị trí hiện tại.");
-            }
+            await fillAddressFromCoords(latitude, longitude);
           } catch (error) {
             console.error("Auto location error", error);
             alert("Có lỗi khi lấy địa chỉ tự động.");
@@ -127,6 +134,16 @@ export default function CitizenRescueRequest() {
       setIsLocating(false);
     }
   };
+
+  const completedSteps = (() => {
+    let steps = 0;
+    if (formData.fullName.trim() && formData.phone.trim()) steps += 1;
+    if (formData.address.trim() && coords.latitude && coords.longitude) steps += 1;
+    if (formData.description.trim()) steps += 1;
+    return steps;
+  })();
+
+  const progressPercent = (completedSteps / 3) * 100;
 
   return (
     <div className="bg-background-light dark:bg-background-dark font-display min-h-screen text-[#131416] dark:text-white transition-colors duration-200">
@@ -199,6 +216,27 @@ export default function CitizenRescueRequest() {
           </h1>
           <p className="text-[#6b7680] dark:text-gray-400 text-lg md:text-xl max-w-2xl">
             Vui lòng điền thông tin chính xác để đội cứu hộ có thể tiếp cận bạn nhanh nhất. Mọi dữ liệu đều được bảo mật.
+          </p>
+        </div>
+
+        {/* Progress */}
+        <div className="bg-white dark:bg-gray-900 border border-[#dee0e3] dark:border-gray-800 rounded-xl p-6 shadow-sm mb-10">
+          <div className="flex justify-between items-center mb-4">
+            <p className="text-lg font-bold">Tiến trình yêu cầu</p>
+            <p className="text-primary font-bold text-sm bg-red-50 dark:bg-red-900/20 px-3 py-1 rounded-full border border-red-100 dark:border-red-800">
+              {completedSteps}/3 bước {completedSteps === 3 ? "hoàn tất" : ""}
+            </p>
+          </div>
+          <div className="w-full bg-[#dee0e3] dark:bg-gray-800 h-3 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-primary transition-all duration-500"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+          <p className="mt-3 text-[#6b7680] dark:text-gray-400 text-sm italic">
+            {completedSteps === 3
+              ? "Sẵn sàng gửi yêu cầu cứu hộ ngay bây giờ."
+              : "Vui lòng hoàn thành đủ thông tin ở các bước trên."}
           </p>
         </div>
 
@@ -279,12 +317,16 @@ export default function CitizenRescueRequest() {
                 </div>
               </div>
               <div className="rounded-xl overflow-hidden border border-[#dee0e3] dark:border-gray-700 h-48 bg-gray-100 relative">
-                <div className="absolute inset-0 flex items-center justify-center bg-gray-200 dark:bg-gray-800">
+                <button
+                  type="button"
+                  onClick={() => setIsMapOpen(true)}
+                  className="absolute inset-0 flex items-center justify-center bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors"
+                >
                   <div className="bg-white/90 dark:bg-black/80 px-4 py-2 rounded-full shadow-lg border border-primary/20 flex items-center gap-2">
-                    <span className="material-symbols-outlined text-red-600 animate-pulse">location_on</span>
-                    <span className="font-medium text-sm">Chạm để chọn trên bản đồ</span>
+                    <span className="material-symbols-outlined text-red-600">location_on</span>
+                    <span className="font-medium text-sm">Chọn vị trí trên bản đồ</span>
                   </div>
-                </div>
+                </button>
               </div>
             </div>
           </section>
@@ -361,6 +403,58 @@ export default function CitizenRescueRequest() {
           </div>
         </form>
       </main>
+
+      {isMapOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-3xl h-[70vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800">
+              <h3 className="text-lg font-bold flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary">map</span>
+                Chọn vị trí cứu hộ
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsMapOpen(false)}
+                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div className="flex-1">
+              <CitizenMapGoong
+                initialCoords={coords.latitude && coords.longitude ? coords : null}
+                onSelectLocation={async ({ latitude, longitude }) => {
+                  setCoords({ latitude, longitude });
+                  await fillAddressFromCoords(latitude, longitude);
+                }}
+              />
+            </div>
+            <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-800 flex items-center justify-between text-sm">
+              <div className="text-gray-600 dark:text-gray-300">
+                Tọa độ đã chọn: {coords.latitude && coords.longitude
+                  ? `${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`
+                  : "Chưa chọn"}
+              </div>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsMapOpen(false)}
+                  className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 text-sm font-medium"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsMapOpen(false)}
+                  className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-primary/90"
+                >
+                  Xác nhận vị trí
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Emergency Sidebar (Sticky Desktop) */}
       <aside className="hidden xl:block fixed right-8 top-32 w-64 space-y-4">

@@ -3,7 +3,6 @@ import { Link, useNavigate } from "react-router-dom";
 import authService from "../services/authService";
 
 const Register = () => {
-  const [role, setRole] = useState("citizen"); // 'citizen' or 'official'
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formData, setFormData] = useState({
@@ -12,7 +11,6 @@ const Register = () => {
     phone: "",
     password: "",
     confirmPassword: "",
-    agreeTerms: false,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -71,38 +69,20 @@ const Register = () => {
         return;
       }
 
-      if (!formData.agreeTerms) {
-        setError("Vui lòng đồng ý với điều khoản sử dụng");
-        setLoading(false);
-        return;
-      }
-
-      // Map role to backend format
-      const roleMapping = {
-        citizen: "CITIZEN",
-        official: "RESCUE_COORDINATOR", // hoặc role khác tùy backend
-      };
-
       // Call register API
       const response = await authService.register({
         fullName: formData.fullName,
         email: formData.email,
         phoneNumber: formData.phone,
         password: formData.password,
-        role: roleMapping[role],
+        role: "CITIZEN",
       });
 
       if (response.success) {
-        if (role === "official") {
-          setSuccess(
-            "Đăng ký thành công! Tài khoản của bạn đang chờ phê duyệt từ quản trị viên. Bạn sẽ nhận được thông báo khi tài khoản được kích hoạt.",
-          );
-        } else {
-          setSuccess("Đăng ký thành công! Đang chuyển đến trang đăng nhập...");
-          setTimeout(() => {
-            navigate("/login");
-          }, 2000);
-        }
+        setSuccess("Đăng ký thành công! Đang chuyển đến trang đăng nhập...");
+        setTimeout(() => {
+          navigate("/login");
+        }, 2000);
       }
     } catch (err) {
       console.error("Register error:", err);
@@ -188,44 +168,16 @@ const Register = () => {
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-              {/* Role Selection */}
+              {/* Role Info (Citizen only) */}
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-2 uppercase tracking-wider text-xs">
                   Vai trò tham gia
                 </label>
-                <div className="flex w-full bg-surface-dark p-1 rounded-lg">
-                  <label className="flex-1 cursor-pointer">
-                    <input
-                      className="peer sr-only"
-                      name="role"
-                      type="radio"
-                      value="citizen"
-                      checked={role === "citizen"}
-                      onChange={(e) => setRole(e.target.value)}
-                    />
-                    <div className="flex items-center justify-center py-2.5 rounded-md text-sm font-medium text-text-secondary transition-all peer-checked:bg-surface-darker peer-checked:text-white peer-checked:shadow-sm peer-checked:ring-1 peer-checked:ring-border-dark hover:text-white">
-                      <span className="material-symbols-outlined text-[18px] mr-2">
-                        person
-                      </span>
-                      Người dân
-                    </div>
-                  </label>
-                  <label className="flex-1 cursor-pointer">
-                    <input
-                      className="peer sr-only"
-                      name="role"
-                      type="radio"
-                      value="official"
-                      checked={role === "official"}
-                      onChange={(e) => setRole(e.target.value)}
-                    />
-                    <div className="flex items-center justify-center py-2.5 rounded-md text-sm font-medium text-text-secondary transition-all peer-checked:bg-surface-darker peer-checked:text-white peer-checked:shadow-sm peer-checked:ring-1 peer-checked:ring-border-dark hover:text-white">
-                      <span className="material-symbols-outlined text-[18px] mr-2">
-                        badge
-                      </span>
-                      Cán bộ / Tổ chức
-                    </div>
-                  </label>
+                <div className="w-full bg-surface-dark px-4 py-3 rounded-lg flex items-center justify-center">
+                  <div className="flex items-center gap-2 text-sm font-medium text-white">
+                    <span className="material-symbols-outlined text-[18px]">person</span>
+                    <span>Người dân</span>
+                  </div>
                 </div>
               </div>
 
@@ -324,34 +276,6 @@ const Register = () => {
                     </span>
                   </div>
                 </div>
-              </div>
-
-              {/* Terms Checkbox */}
-              <div className="flex items-start pt-2">
-                <div className="flex items-center h-5">
-                  <input
-                    id="terms"
-                    name="agreeTerms"
-                    checked={formData.agreeTerms}
-                    onChange={handleInputChange}
-                    className="w-5 h-5 border border-border-dark rounded bg-surface-darker focus:ring-3 focus:ring-primary/30 focus:ring-offset-0 cursor-pointer"
-                    type="checkbox"
-                  />
-                </div>
-                <label
-                  className="ml-3 text-sm font-medium text-text-secondary select-none cursor-pointer"
-                  htmlFor="terms"
-                >
-                  Tôi đồng ý với{" "}
-                  <a className="text-primary hover:underline" href="#">
-                    Điều khoản sử dụng
-                  </a>{" "}
-                  và{" "}
-                  <a className="text-primary hover:underline" href="#">
-                    Chính sách bảo mật
-                  </a>{" "}
-                  của hệ thống.
-                </label>
               </div>
 
               {/* Error Message */}
