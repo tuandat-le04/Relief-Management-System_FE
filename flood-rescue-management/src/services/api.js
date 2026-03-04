@@ -15,6 +15,9 @@ api.interceptors.request.use(
     const token = localStorage.getItem("token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    } else {
+      // Token chưa có – user chưa đăng nhập hoặc localStorage trống
+      console.warn("[api] No token found in localStorage for request:", config.url);
     }
     return config;
   },
@@ -32,28 +35,15 @@ api.interceptors.response.use(
     const originalRequest = error.config;
 
     // Nếu lỗi 401 và chưa retry
+    // Tạm thời KHÔNG tự động xóa token + redirect để tránh bị "đá" khi reload trang.
+    // Có thể triển khai refresh token tại đây nếu backend hỗ trợ.
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
-
-      try {
-        const refreshToken = localStorage.getItem("refreshToken");
-        // TODO: Implement refresh token API nếu backend có
-        // const response = await axios.post('/auth/refresh', { refreshToken });
-        // localStorage.setItem('accessToken', response.data.token);
-        // return api(originalRequest);
-
-        // Nếu không có refresh token API, logout user
-        localStorage.removeItem("token");
-        localStorage.removeItem("refreshToken");
-        localStorage.removeItem("user");
-        window.location.href = "/login";
-      } catch (refreshError) {
-        localStorage.removeItem("token");
-        localStorage.removeItem("refreshToken");
-        localStorage.removeItem("user");
-        window.location.href = "/login";
-        return Promise.reject(refreshError);
-      }
+      // TODO: refresh token (nếu có API), sau đó retry:
+      // const refreshToken = localStorage.getItem("refreshToken");
+      // const response = await axios.post(`${api.defaults.baseURL}/auth/refresh`, { refreshToken });
+      // localStorage.setItem("token", response.data.token);
+      // return api(originalRequest);
     }
 
     return Promise.reject(error);
@@ -61,3 +51,4 @@ api.interceptors.response.use(
 );
 
 export default api;
+

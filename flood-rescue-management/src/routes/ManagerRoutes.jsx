@@ -1,5 +1,5 @@
 import React from "react";
-// import ProtectedRoute from "../components/ProtectedRoute"; // Tạm thời comment để xem preview
+import ProtectedRoute from "../components/ProtectedRoute";
 import ManagerDashboard from "../pages/Manager/ManagerDashboard";
 import ManagerVehicle from "../pages/Manager/ManagerVehicle";
 import ManagerInventory from "../pages/Manager/ManagerInventory";
@@ -8,38 +8,36 @@ import ManagerReports from "../pages/Manager/ManagerReports";
 const ManagerRoutes = [
   {
     path: "/manager/dashboard",
-    element: <ManagerDashboard />, // Tạm thời bỏ ProtectedRoute để xem preview
-    // element: (
-    //   <ProtectedRoute allowedRoles={["manager"]}>
-    //     <ManagerDashboard />
-    //   </ProtectedRoute>
-    // ),
+    element: (
+      <ProtectedRoute allowedRoles={["MANAGER"]}>
+        <ManagerDashboard />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/manager/vehicles",
-    element: <ManagerVehicle />,
-    // element: (
-    //   <ProtectedRoute allowedRoles={["manager"]}>
-    //     <ManagerVehicle />
-    //   </ProtectedRoute>
-    // ),
+    element: (
+      <ProtectedRoute allowedRoles={["MANAGER"]}>
+        <ManagerVehicle />
+      </ProtectedRoute>
+    ),
   },
   // Thêm các routes manager khác ở đây
   {
     path: "/manager/inventory",
-    element: <ManagerInventory />,
-    //     <ProtectedRoute allowedRoles={["manager"]}>
-    //       <InventoryManagement />
-    //     </ProtectedRoute>
+    element: (
+      <ProtectedRoute allowedRoles={["MANAGER"]}>
+        <ManagerInventory />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/manager/reports",
-    element: <ManagerReports />,
-    // element: (
-    //   <ProtectedRoute allowedRoles={["manager"]}>
-    //     <ManagerReports />
-    //   </ProtectedRoute>
-    // ),
+    element: (
+      <ProtectedRoute allowedRoles={["MANAGER"]}>
+        <ManagerReports />
+      </ProtectedRoute>
+    ),
   },
   // {
   //   path: "/manager/distribution",

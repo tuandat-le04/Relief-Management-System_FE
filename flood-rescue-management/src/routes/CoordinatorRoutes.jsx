@@ -1,10 +1,15 @@
 import React from "react";
-import CoordinatorDashboard from "../pages/Coordinator/CoordinatorDashboard";
+import ProtectedRoute from "../components/ProtectedRoute";
+import CoordinatorDashboard from "../pages/coordinator/CoordinatorDashboard";
 
 const CoordinatorRoutes = [
   {
     path: "/coordinator/dashboard",
-    element: <CoordinatorDashboard />,
+    element: (
+      <ProtectedRoute allowedRoles={["RESCUE_COORDINATOR"]}>
+        <CoordinatorDashboard />
+      </ProtectedRoute>
+    ),
   },
   // Thêm các routes coordinator khác ở đây
 ];
