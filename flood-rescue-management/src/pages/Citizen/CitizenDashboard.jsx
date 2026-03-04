@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import authService from "../../services/authService";
 import CitizenMapGoong from "../../components/citizen/CitizenMapGoong";
+import rescueRequestService from "../../services/rescueRequestService";
 
 const CitizenDashboard = () => {
   const navigate = useNavigate();
@@ -10,6 +11,11 @@ const CitizenDashboard = () => {
     safe: true,
     relief: false,
   });
+
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [isLoadingRequests, setIsLoadingRequests] = useState(false);
+  const [userRequests, setUserRequests] = useState([]);
+  const [requestError, setRequestError] = useState("");
 
   const currentUser = authService.getCurrentUser();
   const displayName =
@@ -22,9 +28,82 @@ const CitizenDashboard = () => {
     setLayers((prev) => ({ ...prev, [layer]: !prev[layer] }));
   };
 
+  const getStatusConfig = (status) => {
+    switch (status) {
+      case "CREATED":
+        return {
+          label: "Đã gửi",
+          className:
+            "bg-gray-100 text-gray-800 border border-gray-200 rounded-full px-2.5 py-0.5 text-xs font-semibold",
+        };
+      case "IN_PROGRESS":
+        return {
+          label: "Đang xử lý",
+          className:
+            "bg-blue-50 text-blue-700 border border-blue-200 rounded-full px-2.5 py-0.5 text-xs font-semibold",
+        };
+      case "COMPLETED":
+        return {
+          label: "Đã hoàn thành",
+          className:
+            "bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-2.5 py-0.5 text-xs font-semibold",
+        };
+      case "CANCELLED":
+        return {
+          label: "Đã hủy",
+          className:
+            "bg-red-50 text-red-700 border border-red-200 rounded-full px-2.5 py-0.5 text-xs font-semibold",
+        };
+      default:
+        return {
+          label: status || "Không rõ",
+          className:
+            "bg-gray-100 text-gray-800 border border-gray-200 rounded-full px-2.5 py-0.5 text-xs font-semibold",
+        };
+    }
+  };
+
   const handleLogout = () => {
     authService.logout();
     navigate("/login");
+  };
+
+  const handleOpenNotifications = async () => {
+    try {
+      setIsNotificationOpen(true);
+      setRequestError("");
+      setIsLoadingRequests(true);
+      const user = currentUser;
+      const userId = user?.id ?? user?.userId ?? null;
+
+      if (!userId) {
+        setRequestError("Không xác định được người dùng hiện tại.");
+        setUserRequests([]);
+        setIsLoadingRequests(false);
+        return;
+      }
+
+      const response = await rescueRequestService.getRequestsByUser(userId);
+
+      if (response.success) {
+        setUserRequests(response.data || []);
+      } else {
+        setRequestError(response.error || "Không thể tải trạng thái yêu cầu.");
+      }
+    } catch (error) {
+      console.error("Error loading user requests:", error);
+      setRequestError(
+        error.response?.data?.message ||
+          error.message ||
+          "Không thể tải trạng thái yêu cầu.",
+      );
+    } finally {
+      setIsLoadingRequests(false);
+    }
+  };
+
+  const handleCloseNotifications = () => {
+    setIsNotificationOpen(false);
   };
 
   return (
@@ -84,7 +163,11 @@ const CitizenDashboard = () => {
           </nav>
 
           <div className="flex items-center gap-3 pl-4 border-l border-gray-200 dark:border-gray-700">
-            <button className="relative p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
+            <button
+              className="relative p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+              type="button"
+              onClick={handleOpenNotifications}
+            >
               <span className="material-symbols-outlined text-[22px]">
                 notifications
               </span>
@@ -240,6 +323,78 @@ const CitizenDashboard = () => {
           </div>
         </div>
       </main>
+
+      {isNotificationOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={handleCloseNotifications}
+          />
+          <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-md w-full mx-4 p-5 border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h2 className="text-base md:text-lg font-bold text-gray-900 dark:text-white">
+                  Trạng thái yêu cầu của bạn
+                </h2>
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                  Bao gồm các yêu cầu cứu hộ và nhu yếu phẩm gần đây.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleCloseNotifications}
+                className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500"
+              >
+                <span className="material-symbols-outlined text-sm">close</span>
+              </button>
+            </div>
+
+            <div className="max-h-80 overflow-y-auto space-y-3 mt-2">
+              {isLoadingRequests && (
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                  Đang tải dữ liệu...
+                </p>
+              )}
+
+              {!isLoadingRequests && requestError && (
+                <p className="text-sm text-red-600">{requestError}</p>
+              )}
+
+              {!isLoadingRequests && !requestError &&
+                (userRequests.length === 0 ? (
+                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                    Bạn chưa gửi yêu cầu nào hoặc không tìm thấy dữ liệu.
+                  </p>
+                ) : (
+                  userRequests.map((req) => {
+                    const statusCfg = getStatusConfig(req.status);
+                    return (
+                      <div
+                        key={req.id}
+                        className="border border-gray-200 dark:border-gray-700 rounded-xl p-3 text-sm bg-gray-50/70 dark:bg-gray-800/60"
+                      >
+                        <div className="flex items-center justify-between mb-1.5">
+                          <p className="font-semibold text-gray-900 dark:text-white">
+                            {req.type}
+                          </p>
+                          <span className={statusCfg.className}>
+                            {statusCfg.label}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-600 dark:text-gray-300 line-clamp-2">
+                          {req.description || "Không có mô tả chi tiết."}
+                        </p>
+                        <p className="mt-1 text-[11px] text-gray-500">
+                          Gửi {req.time}
+                        </p>
+                      </div>
+                    );
+                  })
+                ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

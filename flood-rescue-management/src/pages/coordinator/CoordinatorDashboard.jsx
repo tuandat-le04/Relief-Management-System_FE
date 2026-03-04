@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import Header from "../../components/coordinator/Header";
 import TabBar from "../../components/coordinator/TabBar";
 import StatsCards from "../../components/coordinator/StatsCards";

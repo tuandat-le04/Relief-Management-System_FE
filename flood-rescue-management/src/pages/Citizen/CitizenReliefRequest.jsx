@@ -82,7 +82,15 @@ export default function CitizenReliefRequest() {
 			};
 
 			// Gửi đúng endpoint /api/v1/rescue-requests/relief
-			await api.post("/rescue-requests/relief", payload);
+			const response = await api.post("/rescue-requests/relief", payload);
+			try {
+				const created = response?.data?.data;
+				if (created?.id != null) {
+					localStorage.setItem("lastReliefRequestId", String(created.id));
+				}
+			} catch (err) {
+				console.warn("Không lưu được lastReliefRequestId:", err);
+			}
 
 			alert("Yêu cầu nhu yếu phẩm đã được gửi thành công!");
 		} catch (error) {

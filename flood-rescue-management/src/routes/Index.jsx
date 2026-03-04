@@ -4,6 +4,7 @@ import AdminRoutes from "./AdminRoutes";
 import CoordinatorRoutes from "./CoordinatorRoutes";
 import ManagerRoutes from "./ManagerRoutes";
 import CitizenRoutes from "./CitizenRoutes";
+import RescueTeamRoutes from "./RescueTeam";
 import Login from "../pages/Login";
 import Register from "../pages/Register";
 import PublicRoute from "../components/PublicRoute";
@@ -33,6 +34,7 @@ const router = createBrowserRouter([
   ...CoordinatorRoutes,
   ...ManagerRoutes,
   ...CitizenRoutes,
+  ...RescueTeamRoutes,
 ]);
 
 export default router;
