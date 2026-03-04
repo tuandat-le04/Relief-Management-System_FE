@@ -39,8 +39,13 @@ export const mapPriorityToUI = (priority) => {
 export const transformRescueRequest = (item) => ({
   id: item.id,
   name: item.phone || "Không rõ tên", // Tạm dùng phone vì API không có name
-  type: item.requestType === "RESCUE" ? "Cứu hộ khẩn cấp" : "Hỗ trợ cứu trợ",
-  priority: mapPriorityToUI(item.priority),
+  type:
+    item.requestType === "RESCUE"
+      ? "Cứu hộ khẩn cấp"
+      : item.requestType === "RELIEF"
+        ? "Hỗ trợ cứu trợ"
+        : "Khác",
+  priority: item.priority || "MEDIUM", // Giữ nguyên giá trị gốc từ API
   location: item.description || "Không có địa chỉ", // Tạm dùng description
   time: getTimeAgo(item.createdAt),
   coordinates: [item.longitude || 108.2022, item.latitude || 16.0544], // [lng, lat]
@@ -48,6 +53,7 @@ export const transformRescueRequest = (item) => ({
   status: item.status,
   phone: item.phone,
   description: item.description,
+  requestType: item.requestType, // Giữ nguyên requestType gốc
   requestSupplies: item.requestSupplies,
   requestMedia: item.requestMedia,
   createdAt: item.createdAt,
@@ -55,25 +61,22 @@ export const transformRescueRequest = (item) => ({
 
 // API Services
 const rescueRequestService = {
-  // Lấy tất cả rescue requests
+  // Lấy tất cả rescue requests (bao gồm cả RESCUE và RELIEF)
   getAllRequests: async () => {
     try {
       const response = await api.get("/rescue-requests");
 
       console.log("=== DEBUG API RESPONSE ===");
-      console.log("Full response:", response);
       console.log("Response.data:", response.data);
-      console.log("Response.data type:", typeof response.data);
-      console.log("Is Array?:", Array.isArray(response.data));
-      console.log("Response.data.success:", response.data?.success);
-      console.log("Response.data.data:", response.data?.data);
       console.log("========================");
 
-      // Case 1: {success: true, data: [...]}
-      if (response.data?.success && response.data?.data) {
-        const transformedData = response.data.data.map(transformRescueRequest);
-        console.log("✅ Case 1: Standard format with success field");
-        console.log("Transformed Data:", transformedData);
+      // Response format: {success: true, message: "...", data: [...]}
+      if (response.data?.success && Array.isArray(response.data?.data)) {
+        const transformedData = response.data.data
+          .map(transformRescueRequest)
+          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); // Sort mới nhất đến cũ nhất
+
+        console.log("✅ Transformed Data:", transformedData);
 
         return {
           success: true,
@@ -81,36 +84,15 @@ const rescueRequestService = {
         };
       }
 
-      // Case 1b: {success: true, data: null} - API trả về thành công nhưng không có data
-      if (response.data?.success && response.data?.data === null) {
-        console.log(
-          "⚠️ Case 1b: Success but data is null (empty database or no matching records)",
-        );
+      // Trường hợp data null hoặc empty
+      if (
+        response.data?.success &&
+        (response.data?.data === null || response.data?.data?.length === 0)
+      ) {
+        console.log("⚠️ No data available");
         return {
           success: true,
-          data: [], // Trả về array rỗng thay vì báo lỗi
-        };
-      }
-
-      // Case 2: Direct array [{...}, {...}]
-      if (Array.isArray(response.data)) {
-        console.log("✅ Case 2: Direct array format");
-        const transformedData = response.data.map(transformRescueRequest);
-        console.log("Transformed Data:", transformedData);
-        return {
-          success: true,
-          data: transformedData,
-        };
-      }
-
-      // Case 3: Nested data property without success field
-      if (response.data?.data && Array.isArray(response.data.data)) {
-        console.log("✅ Case 3: Nested data without success field");
-        const transformedData = response.data.data.map(transformRescueRequest);
-        console.log("Transformed Data:", transformedData);
-        return {
-          success: true,
-          data: transformedData,
+          data: [],
         };
       }
 
@@ -130,6 +112,44 @@ const rescueRequestService = {
           "Không thể tải dữ liệu yêu cầu cứu hộ",
       };
     }
+  },
+
+  // Lấy requests theo loại (RESCUE hoặc RELIEF)
+  getRequestsByType: async (requestType) => {
+    try {
+      const allRequests = await rescueRequestService.getAllRequests();
+
+      if (!allRequests.success) {
+        return allRequests;
+      }
+
+      const filteredData = allRequests.data.filter(
+        (req) =>
+          req.type ===
+          (requestType === "RESCUE" ? "Cứu hộ khẩn cấp" : "Hỗ trợ cứu trợ"),
+      );
+
+      return {
+        success: true,
+        data: filteredData,
+      };
+    } catch (error) {
+      console.error("Error filtering requests by type:", error);
+      return {
+        success: false,
+        error: "Không thể lọc dữ liệu",
+      };
+    }
+  },
+
+  // Lấy requests cứu hộ (RESCUE)
+  getRescueRequests: async () => {
+    return await rescueRequestService.getRequestsByType("RESCUE");
+  },
+
+  // Lấy requests cứu trợ (RELIEF)
+  getReliefRequests: async () => {
+    return await rescueRequestService.getRequestsByType("RELIEF");
   },
 
   // Lấy requests theo status
@@ -189,22 +209,24 @@ const rescueRequestService = {
   },
 
   // Cập nhật status của request
+  // API nhận Content-Type: text/plain, body là string thuần: "IN_PROGRESS" | "COMPLETED" | ...
   updateRequestStatus: async (id, status) => {
     try {
-      const response = await api.put(`/rescue-requests/${id}/status`, {
-        status,
+      const response = await api.put(`/rescue-requests/${id}/status`, status, {
+        headers: { "Content-Type": "text/plain" },
       });
 
-      if (response.data.success) {
+      if (response.data?.success) {
         return {
           success: true,
-          message: "Cập nhật trạng thái thành công",
+          message: response.data.message || "Cập nhật trạng thái thành công",
+          data: response.data.data,
         };
       }
 
       return {
         success: false,
-        error: "Cập nhật thất bại",
+        error: response.data?.message || "Cập nhật thất bại",
       };
     } catch (error) {
       console.error("Error updating rescue request status:", error);
@@ -214,6 +236,38 @@ const rescueRequestService = {
           error.response?.data?.message ||
           error.message ||
           "Không thể cập nhật trạng thái",
+      };
+    }
+  },
+
+  // Phân loại yêu cầu: cập nhật priority và requestType
+  classifyRequest: async (id, { priority, requestType }) => {
+    try {
+      const response = await api.patch(`/rescue-requests/${id}/classify`, {
+        priority,
+        requestType,
+      });
+
+      if (response.data?.success) {
+        return {
+          success: true,
+          message: response.data.message || "Phân loại yêu cầu thành công",
+          data: response.data.data,
+        };
+      }
+
+      return {
+        success: false,
+        error: response.data?.message || "Phân loại thất bại",
+      };
+    } catch (error) {
+      console.error("Error classifying request:", error);
+      return {
+        success: false,
+        error:
+          error.response?.data?.message ||
+          error.message ||
+          "Không thể phân loại yêu cầu",
       };
     }
   },
@@ -244,6 +298,73 @@ const rescueRequestService = {
           error.response?.data?.message ||
           error.message ||
           "Không thể gán điều phối viên",
+      };
+    }
+  },
+
+  // Tiếp nhận (Approve) request
+  approveRequest: async (requestId) => {
+    try {
+      const response = await api.put(`/rescue-requests/${requestId}/approve`);
+
+      console.log("=== APPROVE API RESPONSE ===");
+      console.log("Full response:", response);
+      console.log("Response.data:", response.data);
+      console.log("Response.data.data:", response.data?.data);
+      console.log("Status in response:", response.data?.data?.status);
+      console.log("===========================");
+
+      if (response.data?.success) {
+        return {
+          success: true,
+          message: response.data.message || "Tiếp nhận yêu cầu thành công",
+          data: response.data.data,
+        };
+      }
+
+      return {
+        success: false,
+        error: response.data?.message || "Tiếp nhận thất bại",
+      };
+    } catch (error) {
+      console.error("Error approving request:", error);
+      return {
+        success: false,
+        error:
+          error.response?.data?.message ||
+          error.message ||
+          "Không thể tiếp nhận yêu cầu",
+      };
+    }
+  },
+
+  // Từ chối (Cancel) request
+  cancelRequest: async (requestId, reason = "") => {
+    try {
+      const response = await api.put(`/rescue-requests/${requestId}/cancel`);
+
+      console.log("Cancel response:", response.data);
+
+      if (response.data?.success) {
+        return {
+          success: true,
+          message: response.data.message || "Từ chối yêu cầu thành công",
+          data: response.data.data,
+        };
+      }
+
+      return {
+        success: false,
+        error: response.data?.message || "Từ chối thất bại",
+      };
+    } catch (error) {
+      console.error("Error canceling request:", error);
+      return {
+        success: false,
+        error:
+          error.response?.data?.message ||
+          error.message ||
+          "Không thể từ chối yêu cầu",
       };
     }
   },
