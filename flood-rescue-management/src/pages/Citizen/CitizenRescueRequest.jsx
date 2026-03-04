@@ -57,7 +57,16 @@ export default function CitizenRescueRequest() {
         requestMedia: null,
       };
 
-      await api.post("/rescue-requests/rescue", payload);
+      const response = await api.post("/rescue-requests/rescue", payload);
+
+      try {
+        const created = response?.data?.data;
+        if (created?.id != null) {
+          localStorage.setItem("lastRescueRequestId", String(created.id));
+        }
+      } catch (e) {
+        console.warn("Không lưu được lastRescueRequestId:", e);
+      }
 
       alert("Yêu cầu cứu hộ đã được gửi thành công!");
       navigate("/citizen/dashboard");

@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from "react";
+localStorage.removeItem("token");
+localStorage.removeItem("user");import React, { useState, useEffect, useRef } from "react";
 import Header from "../../components/coordinator/Header";
 import CancelRequestModal from "../../components/coordinator/CancelRequestModal";
 import ClassifyRequestModal from "../../components/coordinator/ClassifyRequestModal";

@@ -38,6 +38,7 @@ export const mapPriorityToUI = (priority) => {
 // Helper function: Transform data từ API sang format UI
 export const transformRescueRequest = (item) => ({
   id: item.id,
+  userId: item.userId,
   name: item.phone || "Không rõ tên", // Tạm dùng phone vì API không có name
   type:
     item.requestType === "RESCUE"
@@ -176,6 +177,43 @@ const rescueRequestService = {
           error.response?.data?.message ||
           error.message ||
           "Không thể tải dữ liệu",
+      };
+    }
+  },
+
+  // Lấy các request theo người dùng (dùng endpoint riêng cho citizen)
+  getRequestsByUser: async (userId) => {
+    try {
+      if (!userId) {
+        return {
+          success: false,
+          error: "Không xác định được người dùng",
+        };
+      }
+
+      const response = await api.get(`/rescue-requests/user/${userId}`);
+
+      if (response.data?.success && Array.isArray(response.data?.data)) {
+        return {
+          success: true,
+          data: response.data.data
+            .map(transformRescueRequest)
+            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
+        };
+      }
+
+      return {
+        success: false,
+        error: "Không có dữ liệu",
+      };
+    } catch (error) {
+      console.error("Error fetching rescue requests by user:", error);
+      return {
+        success: false,
+        error:
+          error.response?.data?.message ||
+          error.message ||
+          "Không thể tải dữ liệu yêu cầu",
       };
     }
   },
