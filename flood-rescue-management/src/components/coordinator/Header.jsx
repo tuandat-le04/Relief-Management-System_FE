@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import avatarImg from "../../assets/images/avatar-user.png";
 
 const Header = () => {
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -84,7 +85,7 @@ const Header = () => {
             <img
               alt="Avatar"
               className="w-full h-full object-cover"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuDkBLl2T2libGGim2qDlklKUkRgVpteF6tbuXHSX3bocz5FTapdcweoioInZVHfTVzsUQPnVny4GGMpmGXMOl6q2b9HaTMEpMLGK-0_ZEf4Kt45Of-FQjfsWZilT7O09Px4w8tAsJ2p-6sczBElboOZJ8YhNLByFEBzA1iOJnLZKf1dGg_dp3isdjmpBP2ulB6beAy2jev9wn8Ess9x54Itrtoi0HWkHB4UoFftKZ-987Dlqe9SxWfuBUiazR9orGZTO_oE1RNQUDw"
+              src={avatarImg}
             />
           </button>
 
