@@ -100,6 +100,39 @@ const missionService = {
       };
     }
   },
+
+  // Cập nhật trạng thái nhiệm vụ
+  // PATCH /api/v1/missions/{id}/status
+  // Body: { status: "ARRIVED" | "COMPLETED" | ... }
+  updateMissionStatus: async (missionId, status) => {
+    try {
+      const response = await api.patch(`/missions/${missionId}/status`, {
+        status,
+      });
+
+      if (response.data?.success) {
+        return {
+          success: true,
+          message: response.data.message || "Cập nhật trạng thái nhiệm vụ thành công",
+          data: response.data.data,
+        };
+      }
+
+      return {
+        success: false,
+        error: response.data?.message || "Cập nhật trạng thái nhiệm vụ thất bại",
+      };
+    } catch (error) {
+      console.error("Error updating mission status:", error);
+      return {
+        success: false,
+        error:
+          error.response?.data?.message ||
+          error.message ||
+          "Không thể cập nhật trạng thái nhiệm vụ",
+      };
+    }
+  },
 };
 
 export default missionService;
