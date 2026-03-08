@@ -59,6 +59,7 @@ const RequestCard = ({
   onClassify,
   onDetail,
   onFlyTo,
+  onAssign,
 }) => {
   return (
     <div
@@ -129,9 +130,20 @@ const RequestCard = ({
           </div>
         )}
 
-        {/* IN_PROGRESS: Đánh dấu hoàn thành */}
+        {/* IN_PROGRESS: Phân công nhiệm vụ + Đánh dấu hoàn thành */}
         {request.status === "IN_PROGRESS" && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-2">
+            {/* Nút phân công đội & xe */}
+            <button
+              onClick={() => onAssign && onAssign(request)}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined text-base">
+                assignment_ind
+              </span>
+              Phân công đội &amp; phương tiện
+            </button>
+            <div className="flex items-center gap-2">
             <button
               onClick={() => onApprove(request.id, "complete")}
               className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white py-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-sm"
@@ -150,6 +162,7 @@ const RequestCard = ({
                 my_location
               </span>
             </button>
+            </div>
           </div>
         )}
 
