@@ -1,6 +1,31 @@
 import api from "./api";
 
 const missionService = {
+  // Lấy danh sách nhiệm vụ được giao cho tôi (Rescue Team đang đăng nhập)
+  // GET /api/v1/missions/assigned-to-me
+  getAssignedToMe: async () => {
+    try {
+      const response = await api.get("/missions/assigned-to-me");
+      if (response.data?.success) {
+        const list = Array.isArray(response.data?.data) ? response.data.data : [];
+        return { success: true, data: list };
+      }
+      return {
+        success: false,
+        error: response.data?.message || "Không thể tải nhiệm vụ được giao",
+      };
+    } catch (error) {
+      console.error("Error fetching assigned missions:", error);
+      return {
+        success: false,
+        error:
+          error.response?.data?.message ||
+          error.message ||
+          "Không thể tải nhiệm vụ được giao",
+      };
+    }
+  },
+
   // Lấy mission theo requestId
   getMissionByRequestId: async (requestId) => {
     try {

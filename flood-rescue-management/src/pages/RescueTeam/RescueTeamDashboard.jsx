@@ -4,6 +4,10 @@ import { Permission } from "../../constants/permissions";
 import { usePermission } from "../../hooks/usePermission";
 import authService from "../../services/authService";
 import missionService from "../../services/missionService";
+import AssignedMissionMapGoong from "../../components/rescueTeam/AssignedMissionMapGoong";
+import MissionProgress from "../../components/rescueTeam/MissionProgress";
+import api from "../../services/api";
+import goongjs from "@goongmaps/goong-js";
 import rescueRequestService, {
   getTimeAgo,
 } from "../../services/rescueRequestService";
@@ -54,6 +58,172 @@ const haversineKm = (a, b) => {
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
 };
 
+const decodePolyline = (encoded, precision = 5) => {
+  if (!encoded) return [];
+  let index = 0;
+  let lat = 0;
+  let lng = 0;
+  const coordinates = [];
+  const factor = Math.pow(10, precision);
+
+  while (index < encoded.length) {
+    let result = 0;
+    let shift = 0;
+    let b;
+
+    do {
+      b = encoded.charCodeAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+
+    const deltaLat = result & 1 ? ~(result >> 1) : result >> 1;
+    lat += deltaLat;
+
+    result = 0;
+    shift = 0;
+
+    do {
+      b = encoded.charCodeAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+
+    const deltaLng = result & 1 ? ~(result >> 1) : result >> 1;
+    lng += deltaLng;
+
+    // Goong/Mapbox expects [lng, lat]
+    coordinates.push([lng / factor, lat / factor]);
+  }
+
+  return coordinates;
+};
+
+const extractRouteCoordinates = (directionJson) => {
+  const route = directionJson?.routes?.[0];
+  if (!route) return null;
+
+  // Format A: Google-style overview_polyline.points
+  const encodedA = route?.overview_polyline?.points;
+  if (encodedA) return decodePolyline(encodedA, 5);
+
+  // Format B: overview_polyline is a plain string
+  const encodedB = typeof route?.overview_polyline === "string" ? route.overview_polyline : null;
+  if (encodedB) return decodePolyline(encodedB, 5);
+
+  // Format C: Mapbox-style geometry as GeoJSON
+  const geojsonCoords = route?.geometry?.coordinates;
+  if (Array.isArray(geojsonCoords) && geojsonCoords.length > 0) return geojsonCoords;
+
+  // Format D: Mapbox-style geometry as polyline string
+  const encodedC = typeof route?.geometry === "string" ? route.geometry : null;
+  if (encodedC) return decodePolyline(encodedC, 5);
+
+  return null;
+};
+
+const extractRouteSummary = (directionJson) => {
+  const route = directionJson?.routes?.[0];
+  if (!route) return null;
+
+  // Format A: Google Directions style
+  const leg = route?.legs?.[0];
+  const distA = leg?.distance?.value;
+  const durA = leg?.duration?.value;
+  if (Number.isFinite(Number(distA)) || Number.isFinite(Number(durA))) {
+    return {
+      distanceMeters: Number.isFinite(Number(distA)) ? Number(distA) : null,
+      durationSeconds: Number.isFinite(Number(durA)) ? Number(durA) : null,
+    };
+  }
+
+  // Format B: Mapbox/Goong style
+  const distB = route?.distance;
+  const durB = route?.duration;
+  if (Number.isFinite(Number(distB)) || Number.isFinite(Number(durB))) {
+    return {
+      distanceMeters: Number.isFinite(Number(distB)) ? Number(distB) : null,
+      durationSeconds: Number.isFinite(Number(durB)) ? Number(durB) : null,
+    };
+  }
+
+  return null;
+};
+
+const formatDistanceFromMeters = (meters) => {
+  const m = Number(meters);
+  if (!Number.isFinite(m) || m < 0) return "—";
+  if (m < 1000) return `${Math.round(m)} m`;
+  const km = m / 1000;
+  return km < 10 ? `${km.toFixed(1)} km` : `${Math.round(km)} km`;
+};
+
+const formatDurationFromSeconds = (seconds) => {
+  const s = Number(seconds);
+  if (!Number.isFinite(s) || s < 0) return "";
+  const minutes = Math.round(s / 60);
+  if (minutes < 60) return `${minutes} phút`;
+  const hours = Math.floor(minutes / 60);
+  const rem = minutes % 60;
+  return rem ? `${hours}h ${rem}m` : `${hours}h`;
+};
+
+const createOriginBlueDotElement = () => {
+  const el = document.createElement("div");
+  // Tailwind classes are referenced as literal strings so they are included in build
+  el.className = "relative w-8 h-8";
+  el.innerHTML = `
+    <div class="absolute inset-0 rounded-full bg-blue-500/25 animate-ping"></div>
+    <div class="absolute inset-0 rounded-full bg-blue-500/20 blur-sm"></div>
+    <div class="absolute left-1/2 top-1/2 w-3.5 h-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-blue-500 ring-4 ring-blue-200/70 border-2 border-white shadow"></div>
+  `;
+  return el;
+};
+
+const waitForMapLoaded = (map) => {
+  if (!map) return Promise.reject(new Error("Map chưa sẵn sàng"));
+  if (typeof map.loaded === "function" && map.loaded()) return Promise.resolve();
+  return new Promise((resolve) => {
+    map.once("load", resolve);
+  });
+};
+
+const formatAxiosError = (error) => {
+  const status = error?.response?.status;
+  const message =
+    error?.response?.data?.message ||
+    error?.response?.data?.error ||
+    error?.message ||
+    "Request failed";
+  const url = error?.config?.url;
+  const method = error?.config?.method?.toUpperCase();
+  const statusPart = status ? `HTTP ${status}` : "";
+  const reqPart = method && url ? `${method} ${url}` : url ? String(url) : "";
+  return ["Lỗi gọi API", statusPart, reqPart, message].filter(Boolean).join(" - ");
+};
+
+const getEffectiveMissionStatus = (assignment) => {
+  const missionStatus = assignment?.mission?.status ?? null;
+  const assignmentStatus = assignment?.status ?? null;
+
+  // Prefer the non-PENDING status between mission.status and assignment.status.
+  // Backend sometimes keeps one of them at PENDING while the other is already ASSIGNED.
+  if (missionStatus && missionStatus !== "PENDING") return missionStatus;
+  if (assignmentStatus && assignmentStatus !== "PENDING") return assignmentStatus;
+  return missionStatus || assignmentStatus;
+};
+
+const pickFirstActionableAssignment = (list) => {
+  if (!Array.isArray(list) || list.length === 0) return null;
+  return (
+    list.find((a) => {
+      if (!a?.mission) return false;
+      const status = getEffectiveMissionStatus(a);
+      return status !== "PENDING" && status !== "COMPLETED" && status !== "CANCELLED";
+    }) || null
+  );
+};
+
 const RescueTeamDashboard = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -63,12 +233,20 @@ const RescueTeamDashboard = () => {
 
   const mapRef = useRef(null);
   const reportRef = useRef(null);
+  const originMarkerRef = useRef(null);
+  const gpsWatchIdRef = useRef(null);
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [request, setRequest] = useState(null);
   const [mission, setMission] = useState(null);
+  const [rescueTeamId, setRescueTeamId] = useState(null);
+  const [goongMap, setGoongMap] = useState(null);
+  const [startingNavigation, setStartingNavigation] = useState(false);
   const [lastUpdatedAt, setLastUpdatedAt] = useState(Date.now());
+
+  const [routeSummary, setRouteSummary] = useState(null); // { distanceMeters, durationSeconds }
+  const [navigationActive, setNavigationActive] = useState(false);
 
   const [gps, setGps] = useState({
     status: "idle", // idle | updating | ready | error
@@ -96,18 +274,17 @@ const RescueTeamDashboard = () => {
   const priorityLabel = useMemo(() => {
     if (loading) return "Đang tải";
     const p = request?.priority;
-    if (p === "CRITICAL") return "Nguy kịch";
-    if (p === "HIGH") return "Ưu tiên cao";
-    if (p === "MEDIUM") return "Trung bình";
-    if (p === "LOW") return "Thấp";
-    return "Bình thường";
+    // Spec: chỉ hiển thị 2 mức ưu tiên
+    if (p === "CRITICAL") return "YÊU CẦU KHẨN";
+    return "BÌNH THƯỜNG";
   }, [loading, request?.priority]);
 
   const displayRequestCode = useMemo(() => {
     if (loading) return "#RE-....";
-    if (!request?.id) return "#RE-____";
-    return `#RE-${request.id}`;
-  }, [loading, request?.id]);
+    const id = mission?.id;
+    if (id === null || id === undefined) return "#RE-____";
+    return `#RE-${String(id).padStart(3, "0")}`;
+  }, [loading, mission?.id]);
 
   const victimName = loading ? "Đang tải..." : request?.name || "Không rõ tên";
   const victimPhone = loading ? "" : request?.phone || "";
@@ -151,10 +328,13 @@ const RescueTeamDashboard = () => {
   }, [gps.coords, request?.coordinates]);
 
   const distanceLabel = useMemo(() => {
+    if (routeSummary?.distanceMeters !== null && routeSummary?.distanceMeters !== undefined) {
+      return formatDistanceFromMeters(routeSummary.distanceMeters);
+    }
     if (distanceKm === null) return "—";
     if (distanceKm < 1) return `${Math.round(distanceKm * 1000)} m`;
     return `${distanceKm.toFixed(1)} km`;
-  }, [distanceKm]);
+  }, [distanceKm, routeSummary?.distanceMeters]);
 
   const progressText = useMemo(() => {
     if (progressStep === 1) return "Đang di chuyển...";
@@ -167,7 +347,7 @@ const RescueTeamDashboard = () => {
     return receivedTimeAgo;
   }, [receivedTimeAgo]);
 
-  // ---- Load request + mission ----
+  // ---- Load assigned mission (Rescue Team chỉ làm 1 nhiệm vụ) ----
   useEffect(() => {
     let isMounted = true;
 
@@ -181,51 +361,122 @@ const RescueTeamDashboard = () => {
           throw new Error("Bạn chưa đăng nhập hoặc phiên đã hết hạn");
         }
 
-        let requestId = activeRequestIdFromUrl;
-        if (!requestId) {
-          const storedId = parseInt(
-            localStorage.getItem(STORAGE_KEYS.activeRequestId) || "",
-            10,
-          );
-          requestId = Number.isFinite(storedId) ? storedId : null;
+        const assignedRes = await missionService.getAssignedToMe();
+        if (!assignedRes.success) {
+          throw new Error(assignedRes.error || "Không thể tải nhiệm vụ được giao");
         }
 
-        let loadedRequest = null;
-        if (requestId) {
-          const res = await rescueRequestService.getRequestById(requestId);
-          if (res.success) loadedRequest = res.data;
+        const assignment = pickFirstActionableAssignment(assignedRes.data);
+
+        if (!assignment?.mission) {
+          throw new Error("Hiện chưa có nhiệm vụ nào được giao");
         }
 
-        if (!loadedRequest) {
-          const res = await rescueRequestService.getAllRequests();
-          if (!res.success) throw new Error(res.error || "Không thể tải nhiệm vụ");
+        const effectiveMissionStatus = getEffectiveMissionStatus(assignment);
 
-          // Ưu tiên nhiệm vụ đang xử lý; fallback về nhiệm vụ mới nhất
-          loadedRequest =
-            res.data.find((r) => r.status === "IN_PROGRESS") || res.data[0] || null;
+        // If backend returns a mission that is not actionable for Rescue Team yet,
+        // treat it as no active mission.
+        if (
+          effectiveMissionStatus === "COMPLETED" ||
+          effectiveMissionStatus === "PENDING" ||
+          effectiveMissionStatus === "CANCELLED"
+        ) {
+          localStorage.removeItem(STORAGE_KEYS.activeRequestId);
+          if (!isMounted) return;
+          setRequest(null);
+          setMission(null);
+          setProgressStep(1);
+          setRouteSummary(null);
+          setNavigationActive(false);
+          setLastUpdatedAt(Date.now());
+          return;
         }
 
-        if (!loadedRequest) {
-          throw new Error("Hiện chưa có nhiệm vụ nào để hiển thị");
+        const requestId =
+          assignment.request?.id ??
+          assignment.requestId ??
+          assignment.requestID ??
+          assignment.mission?.requestId ??
+          assignment.mission?.requestID ??
+          null;
+        if (requestId === null || requestId === undefined) {
+          throw new Error("Nhiệm vụ thiếu requestId (không thể hiển thị chi tiết)");
         }
+        const loadedRescueTeamId =
+          assignment.rescueTeamId ??
+          assignment.rescueTeamID ??
+          assignment.rescueTeam?.id ??
+          user?.rescueTeamId ??
+          user?.rescueTeamID ??
+          user?.teamId ??
+          user?.teamID ??
+          user?.rescueTeam?.id ??
+          null;
+
+        // Gọi API chi tiết rescue request để lấy SĐT + tình trạng/ghi chú
+        const detailRes = await rescueRequestService.getRequestById(requestId);
+        const detail = detailRes.success ? detailRes.data : null;
+
+        const lat = assignment.request?.latitude;
+        const lng = assignment.request?.longitude;
+        const coordsValid =
+          Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));
+
+        // Fallback theo spec khi API chưa có đầy đủ
+        const loadedRequest = {
+          ...(detail || {}),
+          id: requestId,
+          // Ưu tiên lấy từ assigned-to-me (spec), fallback sang detail nếu cần
+          priority: assignment.request?.priority || detail?.priority,
+          requestType: detail?.requestType || assignment.mission.missionType,
+          createdAt:
+            detail?.createdAt || assignment.mission.createdAt || assignment.mission.startTime,
+          // Nếu detail chưa có phone/description thì UI sẽ fallback
+          phone: detail?.phone || null,
+          description: detail?.description || null,
+          // Giữ tọa độ chính xác từ assigned-to-me
+          coordinates: coordsValid
+            ? [Number(lng), Number(lat)]
+            : (detail?.coordinates || null),
+          // Nếu backend có status của rescue request thì dùng để hiển thị/logic sau này
+          status: detail?.status || assignment.mission.status || "IN_PROGRESS",
+          // ĐỊA ĐIỂM/ĐỊA CHỈ: hiện API detail chưa có field address riêng,
+          // tránh lấy nhầm từ description -> luôn hiển thị theo tọa độ assigned-to-me.
+          location: coordsValid
+            ? `Tọa độ: ${Number(lat).toFixed(6)}, ${Number(lng).toFixed(6)}`
+            : "Đang cập nhật",
+        };
 
         localStorage.setItem(STORAGE_KEYS.activeRequestId, String(loadedRequest.id));
 
-        // Load progress step (client-side) for this request
+        const missionData = {
+          ...(assignment.mission || {}),
+          status: effectiveMissionStatus || assignment.mission?.status,
+        };
+
+        // Progress step should reflect mission status if backend provides it
+        const statusStep =
+          missionData?.status === "ARRIVED"
+            ? 2
+            : missionData?.status === "COMPLETED"
+              ? 3
+              : 1;
+
+        // Fallback to stored (client-side) step only when mission is still IN_PROGRESS
         const stepKey = `${STORAGE_KEYS.progressByRequestPrefix}${loadedRequest.id}`;
         const storedStep = parseInt(localStorage.getItem(stepKey) || "1", 10);
-        const nextStep = Number.isFinite(storedStep)
+        const storedClamped = Number.isFinite(storedStep)
           ? clampNumber(storedStep, 1, 3)
           : 1;
-
-        // Fetch mission linked to request if available
-        const missionRes = await missionService.getMissionByRequestId(loadedRequest.id);
-        const missionData = missionRes.success ? missionRes.data : null;
+        const nextStep = statusStep > 1 ? statusStep : storedClamped;
 
         if (!isMounted) return;
         setRequest(loadedRequest);
         setMission(missionData);
+        setRescueTeamId(loadedRescueTeamId);
         setProgressStep(nextStep);
+        setRouteSummary(null);
+        setNavigationActive(false);
         setLastUpdatedAt(Date.now());
       } catch (err) {
         if (!isMounted) return;
@@ -242,21 +493,99 @@ const RescueTeamDashboard = () => {
     };
   }, [activeRequestIdFromUrl]);
 
-  // Poll refresh request/mission every 30 seconds
+  // Poll refresh assigned mission every 30 seconds
   useEffect(() => {
     if (!request?.id) return undefined;
 
     let cancelled = false;
     const interval = setInterval(async () => {
       try {
-        const [reqRes, misRes] = await Promise.all([
-          rescueRequestService.getRequestById(request.id),
-          missionService.getMissionByRequestId(request.id),
-        ]);
-
+        const assignedRes = await missionService.getAssignedToMe();
         if (cancelled) return;
-        if (reqRes.success) setRequest(reqRes.data);
-        if (misRes.success) setMission(misRes.data);
+        if (!assignedRes.success) return;
+
+        const assignment = pickFirstActionableAssignment(assignedRes.data);
+        if (!assignment?.mission) return;
+
+        const effectiveMissionStatus = getEffectiveMissionStatus(assignment);
+
+        if (
+          effectiveMissionStatus === "COMPLETED" ||
+          effectiveMissionStatus === "PENDING" ||
+          effectiveMissionStatus === "CANCELLED"
+        ) {
+          localStorage.removeItem(STORAGE_KEYS.activeRequestId);
+          setRequest(null);
+          setMission(null);
+          setProgressStep(1);
+          setRouteSummary(null);
+          setNavigationActive(false);
+          setLastUpdatedAt(Date.now());
+          return;
+        }
+
+        const requestId =
+          assignment.request?.id ??
+          assignment.requestId ??
+          assignment.requestID ??
+          assignment.mission?.requestId ??
+          assignment.mission?.requestID ??
+          null;
+        if (requestId === null || requestId === undefined) return;
+        const user = authService.getCurrentUser();
+        const loadedRescueTeamId =
+          assignment.rescueTeamId ??
+          assignment.rescueTeamID ??
+          assignment.rescueTeam?.id ??
+          user?.rescueTeamId ??
+          user?.rescueTeamID ??
+          user?.teamId ??
+          user?.teamID ??
+          user?.rescueTeam?.id ??
+          null;
+        const detailRes = await rescueRequestService.getRequestById(requestId);
+        const detail = detailRes.success ? detailRes.data : null;
+
+        const lat = assignment.request?.latitude;
+        const lng = assignment.request?.longitude;
+        const coordsValid =
+          Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));
+
+        setMission({
+          ...(assignment.mission || {}),
+          status: effectiveMissionStatus || assignment.mission?.status,
+        });
+        setRescueTeamId(loadedRescueTeamId);
+        setRequest((prev) => ({
+          ...(prev || {}),
+          ...(detail || {}),
+          id: requestId,
+          priority: assignment.request?.priority || detail?.priority || prev?.priority,
+          requestType:
+            detail?.requestType || assignment.mission.missionType || prev?.requestType,
+          createdAt:
+            detail?.createdAt ||
+            assignment.mission.createdAt ||
+            assignment.mission.startTime ||
+            prev?.createdAt,
+          phone: detail?.phone || prev?.phone || null,
+          description: detail?.description || prev?.description || null,
+          coordinates: coordsValid
+            ? [Number(lng), Number(lat)]
+            : (detail?.coordinates || prev?.coordinates || null),
+          status:
+            detail?.status ||
+            effectiveMissionStatus ||
+            assignment.mission?.status ||
+            prev?.status,
+          // ĐỊA ĐIỂM/ĐỊA CHỈ: luôn hiển thị theo tọa độ assigned-to-me
+          location: coordsValid
+            ? `Tọa độ: ${Number(lat).toFixed(6)}, ${Number(lng).toFixed(6)}`
+            : (prev?.location || "Đang cập nhật"),
+        }));
+        // Keep UI progress in sync with mission status
+        if (effectiveMissionStatus === "ARRIVED") setProgressStep(2);
+        if (effectiveMissionStatus === "COMPLETED") setProgressStep(3);
         setLastUpdatedAt(Date.now());
       } catch {
         // silent polling failures
@@ -281,17 +610,40 @@ const RescueTeamDashboard = () => {
     }
 
     setGps((s) => ({ ...s, status: "updating", error: null }));
+
+    // Make sure we don't leak multiple watchers
+    if (gpsWatchIdRef.current !== null && gpsWatchIdRef.current !== undefined) {
+      try {
+        navigator.geolocation.clearWatch(gpsWatchIdRef.current);
+      } catch {
+        // ignore
+      }
+      gpsWatchIdRef.current = null;
+    }
+
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
+        const nextLat = pos.coords.latitude;
+        const nextLng = pos.coords.longitude;
+
         setGps({
           status: "ready",
           coords: {
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude,
+            lat: nextLat,
+            lng: nextLng,
           },
           updatedAt: Date.now(),
           error: null,
         });
+
+        // UI only: if navigation has started, move the blue dot marker with device GPS
+        if (navigationActive && originMarkerRef.current) {
+          const lng = Number(nextLng);
+          const lat = Number(nextLat);
+          if (Number.isFinite(lat) && Number.isFinite(lng)) {
+            originMarkerRef.current.setLngLat([lng, lat]);
+          }
+        }
       },
       (err) => {
         setGps((s) => ({
@@ -307,10 +659,19 @@ const RescueTeamDashboard = () => {
       },
     );
 
+    gpsWatchIdRef.current = watchId;
+
     return () => {
-      navigator.geolocation.clearWatch(watchId);
+      if (gpsWatchIdRef.current !== null && gpsWatchIdRef.current !== undefined) {
+        try {
+          navigator.geolocation.clearWatch(gpsWatchIdRef.current);
+        } catch {
+          // ignore
+        }
+        gpsWatchIdRef.current = null;
+      }
     };
-  }, []);
+  }, [navigationActive]);
 
   // Keep progressStep persisted per request
   useEffect(() => {
@@ -373,27 +734,172 @@ const RescueTeamDashboard = () => {
   };
 
   const handleStartNavigation = async () => {
-    const destination = (() => {
-      if (request?.coordinates && request.coordinates.length === 2) {
-        const [lng, lat] = request.coordinates;
-        if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
+    if (startingNavigation) return;
+    setStartingNavigation(true);
+
+    try {
+      const destination = (() => {
+        if (request?.coordinates && request.coordinates.length === 2) {
+          const [lng, lat] = request.coordinates;
+          if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
+        }
+        return null;
+      })();
+
+      if (!destination) {
+        throw new Error("Chưa có tọa độ điểm đến");
       }
-      return null;
-    })();
+      const currentUser = authService.getCurrentUser();
+      const effectiveRescueTeamId =
+        rescueTeamId ??
+        currentUser?.rescueTeamId ??
+        currentUser?.rescueTeamID ??
+        currentUser?.teamId ??
+        currentUser?.teamID ??
+        currentUser?.rescueTeam?.id ??
+        null;
+      if (effectiveRescueTeamId === null || effectiveRescueTeamId === undefined) {
+        throw new Error("Thiếu rescueTeamId (chưa lấy được từ nhiệm vụ hoặc profile)");
+      }
 
-    const origin = gps.coords;
-    let url = "";
-    if (destination) {
-      const originPart = origin ? `&origin=${origin.lat},${origin.lng}` : "";
-      url = `https://www.google.com/maps/dir/?api=1${originPart}&destination=${destination.lat},${destination.lng}`;
-    } else {
-      url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-        victimAddress,
-      )}`;
+      await waitForMapLoaded(goongMap);
+
+      // 1) Lấy vị trí hiện tại của đội từ backend (Origin)
+      let posRes;
+      const posEndpoint = `/team-positions/team/${effectiveRescueTeamId}`;
+      try {
+        posRes = await api.get(posEndpoint);
+      } catch (error) {
+        throw new Error(`${formatAxiosError(error)} (endpoint: ${posEndpoint}, rescueTeamId: ${effectiveRescueTeamId})`);
+      }
+      if (!posRes.data?.success) {
+        throw new Error(
+          `Không lấy được vị trí hiện tại của đội - ${posRes.data?.message || "Unknown error"} (endpoint: ${posEndpoint}, rescueTeamId: ${effectiveRescueTeamId})`,
+        );
+      }
+      const originLat = Number(posRes.data?.data?.latitude);
+      const originLng = Number(posRes.data?.data?.longitude);
+      if (!Number.isFinite(originLat) || !Number.isFinite(originLng)) {
+        throw new Error("Tọa độ điểm đi không hợp lệ");
+      }
+
+      // Marker origin (blue dot GPS-style)
+      const originLngLat = [originLng, originLat];
+      if (!originMarkerRef.current) {
+        const el = createOriginBlueDotElement();
+        originMarkerRef.current = new goongjs.Marker({ element: el, anchor: "center" })
+          .setLngLat(originLngLat)
+          .addTo(goongMap);
+      } else {
+        originMarkerRef.current.setLngLat(originLngLat);
+      }
+
+      // Center camera at origin (zoom ~15)
+      goongMap.flyTo({
+        center: originLngLat,
+        zoom: 15,
+        speed: 1.2,
+        curve: 1.2,
+        essential: true,
+      });
+
+      // 2) Gọi Goong Direction API
+      // Dùng key REST theo convention hiện có trong project (đang dùng cho geocode)
+      const goongKey = import.meta.env.VITE_GOONG_GEOLOCATION_KEY;
+      if (!goongKey) {
+        throw new Error("Thiếu VITE_GOONG_GEOLOCATION_KEY trong .env (dùng cho Direction API)");
+      }
+
+      // Use v2 endpoint so it appears under Api v2 stats in Goong Dashboard
+      const directionUrl = `https://rsapi.goong.io/v2/direction?origin=${originLat},${originLng}&destination=${destination.lat},${destination.lng}&vehicle=car&api_key=${goongKey}`;
+      const directionRes = await fetch(directionUrl);
+      if (!directionRes.ok) {
+        let body = "";
+        try {
+          body = await directionRes.text();
+        } catch {
+          body = "";
+        }
+        throw new Error(
+          `Direction API lỗi HTTP ${directionRes.status}${body ? ` - ${body}` : ""}`,
+        );
+      }
+      const directionJson = await directionRes.json();
+
+      // Store API route distance/time if present
+      const summary = extractRouteSummary(directionJson);
+      if (summary) setRouteSummary(summary);
+
+      const lineCoords = extractRouteCoordinates(directionJson);
+      if (!Array.isArray(lineCoords) || lineCoords.length === 0) {
+        throw new Error("Không đọc được dữ liệu tuyến đường từ Direction response");
+      }
+
+      // 3) Add/Update source + layer để vẽ đường đứt nét
+      const sourceId = "rescue-team-route-source";
+      const layerId = "rescue-team-route-layer";
+      const geojson = {
+        type: "FeatureCollection",
+        features: [
+          {
+            type: "Feature",
+            properties: {},
+            geometry: { type: "LineString", coordinates: lineCoords },
+          },
+        ],
+      };
+
+      if (goongMap.getSource(sourceId)) {
+        goongMap.getSource(sourceId).setData(geojson);
+      } else {
+        goongMap.addSource(sourceId, { type: "geojson", data: geojson });
+      }
+
+      if (!goongMap.getLayer(layerId)) {
+        goongMap.addLayer({
+          id: layerId,
+          type: "line",
+          source: sourceId,
+          layout: { "line-join": "round", "line-cap": "round" },
+          paint: {
+            "line-color": "#3b82f6",
+            "line-width": 4,
+            "line-opacity": 0.95,
+            "line-dasharray": [2, 2],
+          },
+        });
+      }
+
+      setNavigationActive(true);
+    } catch (err) {
+      console.error(err);
+      window.alert(err?.message || "Không thể bắt đầu dẫn đường");
+    } finally {
+      setStartingNavigation(false);
     }
-
-    window.open(url, "_blank", "noopener,noreferrer");
   };
+
+  const effectiveRescueTeamIdForUi = (() => {
+    const currentUser = authService.getCurrentUser();
+    return (
+      rescueTeamId ??
+      currentUser?.rescueTeamId ??
+      currentUser?.rescueTeamID ??
+      currentUser?.teamId ??
+      currentUser?.teamID ??
+      currentUser?.rescueTeam?.id ??
+      null
+    );
+  })();
+
+  const canStartNavigation =
+    !loading &&
+    !startingNavigation &&
+    !!goongMap &&
+    effectiveRescueTeamIdForUi !== null &&
+    effectiveRescueTeamIdForUi !== undefined &&
+    Array.isArray(request?.coordinates) &&
+    request.coordinates.length === 2;
 
   const handleSetStep = async (nextStep) => {
     const step = clampNumber(nextStep, 1, 3);
@@ -498,6 +1004,14 @@ const RescueTeamDashboard = () => {
       ? HEALTH_ACTIVE_CLASS
       : HEALTH_INACTIVE_RED_CLASS;
 
+  const hasActiveMission =
+    !loading &&
+    !!mission &&
+    mission.status !== "COMPLETED" &&
+    mission.status !== "PENDING" &&
+    mission.status !== "CANCELLED" &&
+    !!request;
+
   return (
     <div className="bg-background-light dark:bg-background-dark font-display text-[#131416] dark:text-white min-h-screen">
       <header className="sticky top-0 z-50 flex items-center justify-between border-b border-solid border-[#e5e7eb] dark:border-[#374151] bg-white dark:bg-background-dark px-6 py-3 lg:px-10 shadow-sm">
@@ -572,7 +1086,7 @@ const RescueTeamDashboard = () => {
                 <span className="material-symbols-outlined">assignment</span>
                 <p className="text-sm font-bold">Nhiệm vụ</p>
               </div>
-              <span className="bg-white/20 px-2.5 py-0.5 rounded text-xs font-bold">1</span>
+              <span className="bg-white/20 px-2.5 py-0.5 rounded text-xs font-bold">{hasActiveMission ? 1 : 0}</span>
             </div>
             <div
               className="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
@@ -604,7 +1118,27 @@ const RescueTeamDashboard = () => {
         </aside>
 
         <section className="flex-1 flex flex-col h-full bg-[#f6f7f8] dark:bg-background-dark overflow-hidden relative">
-          <div className="h-full grid grid-cols-1 xl:grid-cols-12 overflow-hidden">
+          {!loading && !hasActiveMission ? (
+            <div className="h-full flex items-center justify-center p-8">
+              <div className="w-full max-w-xl bg-white dark:bg-[#1c1e22] border border-gray-200 dark:border-gray-700 rounded-2xl p-8 shadow-xl">
+                <div className="flex items-start gap-4">
+                  <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-3">
+                    <span className="material-symbols-outlined text-success-green text-3xl">task_alt</span>
+                  </div>
+                  <div className="flex-1">
+                    <h2 className="text-xl font-black text-gray-900 dark:text-white">Không có nhiệm vụ đang thực hiện</h2>
+                    <p className="mt-1 text-sm text-gray-500 font-medium">
+                      Nhiệm vụ đã hoàn thành hoặc hệ thống chưa phân công nhiệm vụ mới cho đội.
+                    </p>
+                    <p className="mt-4 text-xs text-gray-400 font-bold uppercase tracking-widest">
+                      Trạng thái: Sẵn sàng nhận nhiệm vụ
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="h-full grid grid-cols-1 xl:grid-cols-12 overflow-hidden">
             <div className="xl:col-span-4 flex flex-col border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-[#1c1e22] h-full overflow-hidden shadow-xl z-10">
               <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-[#1c1e22]">
                 <div className="flex items-center justify-between mb-2">
@@ -760,14 +1294,13 @@ const RescueTeamDashboard = () => {
                       ref={mapRef}
                       className="flex flex-col h-full min-h-[400px] bg-gray-100 dark:bg-gray-800 rounded-2xl overflow-hidden border-2 border-white dark:border-gray-600 shadow-lg relative group"
                     >
-                      <div
-                        className="absolute inset-0 bg-cover bg-center"
-                        style={{
-                          backgroundImage:
-                            'url("https://lh3.googleusercontent.com/aida-public/AB6AXuCqsK5_7Vc18hUsLgo-3VX5DbLnuwZPf9azv3cTD2FliDfLyxFfdnrBjjWEsOLALQ4YJEpBxzs25_s3Y7-QJO951TAMsKosAyc77QSXYawg1XwcFSXjoI-mLbefxByCLxQ--UL5hB9zS7tetR6EnUki2QhIznRDFm39OTme-ajQZeJ2t-lRsUTDGMI3A8wR28iescpGhCi0xvNxcopHFs5lDxbDWooKArxdxrGDyuDLiY-F2x6Rco_J6VoKvES0R-r43ymIAUyiYKZk")',
-                          filter: "brightness(0.9)",
-                        }}
-                      ></div>
+                      <div className="absolute inset-0">
+                        <AssignedMissionMapGoong
+                          latitude={request?.coordinates?.[1]}
+                          longitude={request?.coordinates?.[0]}
+                          onMapReady={setGoongMap}
+                        />
+                      </div>
                       <div className="absolute top-4 left-4 right-4 flex justify-between items-start pointer-events-none">
                         <div className="bg-white/90 backdrop-blur dark:bg-gray-900/90 px-3 py-2 rounded-lg shadow-md pointer-events-auto">
                           <p className="text-xs font-bold text-gray-500 uppercase">GPS Đội cứu hộ</p>
@@ -795,38 +1328,19 @@ const RescueTeamDashboard = () => {
                         </div>
                       </div>
 
-                      <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                        <svg className="absolute w-full h-full" style={{ zIndex: 1 }}>
-                          <path
-                            d="M100,300 Q250,150 400,200"
-                            fill="none"
-                            stroke="#3b82f6"
-                            strokeDasharray="10,5"
-                            strokeLinecap="round"
-                            strokeWidth="4"
-                          ></path>
-                          <circle cx="100" cy="300" fill="#3b82f6" r="8" stroke="white" strokeWidth="2"></circle>
-                          <circle
-                            className="animate-ping"
-                            cx="400"
-                            cy="200"
-                            fill="#dc2626"
-                            r="8"
-                            stroke="white"
-                            strokeWidth="2"
-                          ></circle>
-                          <circle cx="400" cy="200" fill="#dc2626" r="8" stroke="white" strokeWidth="2"></circle>
-                        </svg>
-                      </div>
-
                       <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
                         <button
                           type="button"
-                          className="w-full bg-blue-600 hover:bg-blue-500 text-white h-14 rounded-xl flex items-center justify-center gap-2 text-lg font-black shadow-xl transition-all transform active:scale-[0.98] border-2 border-blue-400/50"
+                          disabled={!canStartNavigation}
+                          className={`w-full bg-blue-600 hover:bg-blue-500 text-white h-14 rounded-xl flex items-center justify-center gap-2 text-lg font-black shadow-xl transition-all transform active:scale-[0.98] border-2 border-blue-400/50 ${
+                            canStartNavigation
+                              ? ""
+                              : "opacity-60 cursor-not-allowed hover:bg-blue-600"
+                          }`}
                           onClick={handleStartNavigation}
                         >
                           <span className="material-symbols-outlined text-3xl">turn_right</span>
-                          BẮT ĐẦU DẪN ĐƯỜNG
+                          {startingNavigation ? "ĐANG TẢI..." : "BẮT ĐẦU DẪN ĐƯỜNG"}
                         </button>
                       </div>
                     </div>
@@ -835,57 +1349,23 @@ const RescueTeamDashboard = () => {
 
                 <div className="bg-gray-50 dark:bg-gray-800/50 border-t border-gray-200 dark:border-gray-700 p-6 lg:p-8">
                   <h3 className="text-center text-gray-400 text-xs font-bold uppercase tracking-[0.2em] mb-6">Tiến độ thực hiện</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                    <button
-                      type="button"
-                      className={TASK_STEP_1_CLASS}
-                      onClick={() => handleSetStep(1)}
-                    >
-                      <span className="material-symbols-outlined text-3xl">local_shipping</span>
-                      <div className="text-left">
-                        <span className="block text-xs font-bold uppercase">Bước 1</span>
-                        <span className="block text-lg font-black">Đang di chuyển</span>
-                      </div>
-                      <span
-                        className="absolute right-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-green-500"
-                        style={{ visibility: progressStep >= 1 ? "visible" : "hidden" }}
-                      >
-                        check_circle
-                      </span>
-                    </button>
-
-                    <button
-                      type="button"
-                      className={TASK_STEP_2_CLASS}
-                      onClick={() => handleSetStep(2)}
-                    >
-                      <span className="material-symbols-outlined text-3xl">where_to_vote</span>
-                      <div className="text-left">
-                        <span className="block text-xs font-bold uppercase">Bước 2</span>
-                        <span className="block text-lg font-black">Đã đến nơi</span>
-                      </div>
-                      <span
-                        className="absolute right-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-green-500"
-                        style={{ visibility: progressStep >= 2 ? "visible" : "hidden" }}
-                      >
-                        check_circle
-                      </span>
-                    </button>
-
-                    <button
-                      type="button"
-                      className={TASK_STEP_3_CLASS}
-                      onClick={() => {
-                        handleSetStep(3);
-                        scrollToReport();
+                  <div className="mb-8">
+                    <MissionProgress
+                      missionId={mission?.id}
+                      initialStatus={mission?.status || "IN_PROGRESS"}
+                      onStatusChange={(nextStatus) => {
+                        setMission((prev) => (prev ? { ...prev, status: nextStatus } : prev));
+                        if (nextStatus === "ARRIVED") setProgressStep(2);
+                        if (nextStatus === "COMPLETED") {
+                          setProgressStep(3);
+                          localStorage.removeItem(STORAGE_KEYS.activeRequestId);
+                          setRouteSummary(null);
+                          setNavigationActive(false);
+                          setRequest(null);
+                          setMission(null);
+                        }
                       }}
-                    >
-                      <span className="material-symbols-outlined text-3xl">task_alt</span>
-                      <div className="text-left">
-                        <span className="block text-xs font-bold uppercase opacity-80">Bước 3</span>
-                        <span className="block text-lg font-black">Hoàn thành</span>
-                      </div>
-                    </button>
+                    />
                   </div>
 
                   <div
@@ -981,7 +1461,8 @@ const RescueTeamDashboard = () => {
                 </div>
               </div>
             </div>
-          </div>
+            </div>
+          )}
         </section>
       </main>
 
