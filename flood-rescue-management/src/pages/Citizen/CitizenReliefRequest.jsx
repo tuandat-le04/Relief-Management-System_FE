@@ -1,11 +1,33 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import authService from "../../services/authService";
 import api from "../../services/api";
 import CitizenMapGoong from "../../components/citizen/CitizenMapGoong";
 
-export default function CitizenReliefRequest() {
+const MAX_MEDIA_FILES = 5;
+const MAX_MEDIA_SIZE_BYTES = 20 * 1024 * 1024; // 20MB
+
+const formatBytes = (bytes) => {
+	const size = Number(bytes);
+	if (!Number.isFinite(size) || size <= 0) return "0 B";
+	const units = ["B", "KB", "MB", "GB"];
+	const idx = Math.min(units.length - 1, Math.floor(Math.log(size) / Math.log(1024)));
+	const value = size / 1024 ** idx;
+	return `${value.toFixed(value >= 10 || idx === 0 ? 0 : 1)} ${units[idx]}`;
+};
+
+const isAllowedMediaType = (mime) => {
+	if (!mime) return false;
+	return mime.startsWith("image/") || mime.startsWith("video/");
+};
+
+export default function CitizenReliefRequest({ requestId: requestIdProp } = {}) {
 	const navigate = useNavigate();
+	const fileInputRef = useRef(null);
+	const [mediaItems, setMediaItems] = useState([]);
+	const [mediaError, setMediaError] = useState("");
+	const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+	const [uploadedMedia, setUploadedMedia] = useState([]);
 	const [form, setForm] = useState({
 		fullName: "",
 		phone: "",
@@ -25,6 +47,28 @@ export default function CitizenReliefRequest() {
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [isMapOpen, setIsMapOpen] = useState(false);
 
+	const resolvedRequestIdForUpload = useMemo(() => {
+		if (requestIdProp != null) {
+			const n = Number(requestIdProp);
+			return Number.isFinite(n) && n > 0 ? n : null;
+		}
+		const stored = parseInt(localStorage.getItem("lastReliefRequestId") || "", 10);
+		return Number.isFinite(stored) && stored > 0 ? stored : null;
+	}, [requestIdProp]);
+
+	useEffect(() => {
+		return () => {
+			mediaItems.forEach((it) => {
+				try {
+					URL.revokeObjectURL(it.previewUrl);
+				} catch {
+					// ignore
+				}
+			});
+		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
+
 	const handleChange = (field) => (e) => {
 		setForm((prev) => ({ ...prev, [field]: e.target.value }));
 	};
@@ -34,6 +78,122 @@ export default function CitizenReliefRequest() {
 			...prev,
 			supplies: { ...prev.supplies, [key]: !prev.supplies[key] },
 		}));
+	};
+
+	const addSelectedMediaFiles = (fileList) => {
+		setMediaError("");
+		const incoming = Array.from(fileList || []);
+		if (incoming.length === 0) return;
+
+		setMediaItems((prev) => {
+			const remainingSlots = Math.max(0, MAX_MEDIA_FILES - prev.length);
+			const next = [...prev];
+			const errors = [];
+
+			for (const file of incoming) {
+				if (next.length >= MAX_MEDIA_FILES) {
+					errors.push(`Chỉ được chọn tối đa ${MAX_MEDIA_FILES} file.`);
+					break;
+				}
+				if (!isAllowedMediaType(file.type)) {
+					errors.push(`File "${file.name}" không đúng định dạng (chỉ cho phép ảnh/video).`);
+					continue;
+				}
+				if (file.size > MAX_MEDIA_SIZE_BYTES) {
+					errors.push(`File "${file.name}" vượt quá 20MB (${formatBytes(file.size)}).`);
+					continue;
+				}
+				if (remainingSlots === 0) {
+					errors.push(`Đã đạt giới hạn ${MAX_MEDIA_FILES} file.`);
+					break;
+				}
+
+				const previewUrl = URL.createObjectURL(file);
+				const id =
+					typeof crypto !== "undefined" && crypto.randomUUID
+						? crypto.randomUUID()
+						: `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+				next.push({
+					id,
+					file,
+					previewUrl,
+					kind: file.type.startsWith("video/") ? "video" : "image",
+				});
+			}
+
+			if (errors.length > 0) {
+				setMediaError(errors[0]);
+				window.alert(errors.join("\n"));
+			}
+
+			return next;
+		});
+	};
+
+	const handlePickMediaClick = () => {
+		fileInputRef.current?.click();
+	};
+
+	const handleMediaInputChange = (e) => {
+		addSelectedMediaFiles(e.target.files);
+		// allow re-selecting the same file
+		e.target.value = "";
+	};
+
+	const handleRemoveMedia = (id) => {
+		setMediaItems((prev) => {
+			const target = prev.find((x) => x.id === id);
+			if (target) {
+				try {
+					URL.revokeObjectURL(target.previewUrl);
+				} catch {
+					// ignore
+				}
+			}
+			return prev.filter((x) => x.id !== id);
+		});
+	};
+
+	const uploadMediaFiles = async (requestId, items) => {
+		if (!requestId) throw new Error("Thiếu requestId để upload media");
+		if (!items || items.length === 0) return { success: 0, failed: 0 };
+
+		setIsUploadingMedia(true);
+		try {
+			const results = await Promise.allSettled(
+				items.map(async (it) => {
+					const formData = new FormData();
+					formData.append("file", it.file);
+
+					const res = await api.post(`/rescue-requests/${requestId}/media`, formData, {
+						headers: { "Content-Type": "multipart/form-data" },
+					});
+					return res?.data;
+				}),
+			);
+
+			let successCount = 0;
+			let failedCount = 0;
+			const uploaded = [];
+
+			for (const r of results) {
+				if (r.status === "fulfilled" && r.value?.success) {
+					successCount += 1;
+					if (r.value?.data) uploaded.push(r.value.data);
+				} else {
+					failedCount += 1;
+				}
+			}
+
+			if (uploaded.length > 0) {
+				setUploadedMedia((prev) => [...uploaded, ...prev]);
+			}
+
+			return { success: successCount, failed: failedCount };
+		} finally {
+			setIsUploadingMedia(false);
+		}
 	};
 
 	const fillAddressFromCoords = async (latitude, longitude) => {
@@ -85,8 +245,21 @@ export default function CitizenReliefRequest() {
 			const response = await api.post("/rescue-requests/relief", payload);
 			try {
 				const created = response?.data?.data;
+				const createdId = created?.id != null ? Number(created.id) : null;
 				if (created?.id != null) {
 					localStorage.setItem("lastReliefRequestId", String(created.id));
+				}
+
+				// Upload media (if any) after request is created
+				if (mediaItems.length > 0 && createdId) {
+					const { success, failed } = await uploadMediaFiles(createdId, mediaItems);
+					if (failed === 0) {
+						window.alert(`Upload thành công ${success}/${mediaItems.length} file.`);
+					} else {
+						window.alert(
+							`Upload xong: ${success}/${mediaItems.length} file thành công, ${failed} file thất bại.`,
+						);
+					}
 				}
 			} catch (err) {
 				console.warn("Không lưu được lastReliefRequestId:", err);
@@ -275,7 +448,7 @@ export default function CitizenReliefRequest() {
 								<div className="flex flex-col gap-2">
 									<label className="text-[#131416] dark:text-gray-200 text-lg font-bold">Họ và tên</label>
 									<input
-										className="h-14 rounded-lg border-[#dee0e3] dark:border-gray-700 bg-white dark:bg-gray-800 text-lg focus:ring-0 focus:border-primary px-4"
+										className="h-14 rounded-lg border border-[#dee0e3] dark:border-gray-700 bg-white dark:bg-gray-800 text-lg focus:ring-0 focus:border-primary px-4"
 										placeholder="Nhập tên người cần tiếp tế"
 										type="text"
 										value={form.fullName}
@@ -285,7 +458,7 @@ export default function CitizenReliefRequest() {
 								<div className="flex flex-col gap-2">
 									<label className="text-[#131416] dark:text-gray-200 text-lg font-bold">Số điện thoại</label>
 									<input
-										className="h-14 rounded-lg border-[#dee0e3] dark:border-gray-700 bg-white dark:bg-gray-800 text-lg focus:ring-0 focus:border-primary px-4"
+										className="h-14 rounded-lg border border-[#dee0e3] dark:border-gray-700 bg-white dark:bg-gray-800 text-lg focus:ring-0 focus:border-primary px-4"
 										placeholder="Số liên lạc khẩn cấp"
 										type="tel"
 										value={form.phone}
@@ -308,7 +481,7 @@ export default function CitizenReliefRequest() {
 									<label className="text-[#131416] dark:text-gray-200 text-lg font-bold">Địa chỉ chi tiết</label>
 									<div className="flex flex-col md:flex-row gap-4">
 										<input
-											className="flex-1 h-14 rounded-lg border-[#dee0e3] dark:border-gray-700 bg-white dark:bg-gray-800 text-lg focus:ring-0 focus:border-primary px-4"
+											className="flex-1 h-14 rounded-lg border border-[#dee0e3] dark:border-gray-700 bg-white dark:bg-gray-800 text-lg focus:ring-0 focus:border-primary px-4"
 											placeholder="Xóm, thôn, xã, huyện, tỉnh..."
 											type="text"
 											value={form.address}
@@ -399,7 +572,7 @@ export default function CitizenReliefRequest() {
 								<div className="flex flex-col gap-2">
 									<label className="text-[#131416] dark:text-gray-200 text-lg font-bold">Mô tả chi tiết nhu cầu</label>
 									<textarea
-										className="w-full rounded-lg border-[#dee0e3] dark:border-gray-700 bg-white dark:bg-gray-800 text-lg focus:ring-0 focus:border-primary p-4"
+										className="w-full rounded-lg border border-[#dee0e3] dark:border-gray-700 bg-white dark:bg-gray-800 text-lg focus:ring-0 focus:border-primary p-4"
 										placeholder="Ví dụ: Cần sữa cho trẻ em 1 tuổi, băng vệ sinh phụ nữ, pin đèn pin..."
 										rows={4}
 										value={form.description}
@@ -418,17 +591,97 @@ export default function CitizenReliefRequest() {
 								</h3>
 							</div>
 							<div className="p-6">
-								<div className="border-2 border-dashed border-[#dee0e3] dark:border-gray-700 rounded-xl p-10 flex flex-col items-center justify-center gap-3 bg-gray-50/30 dark:bg-gray-800/30 hover:bg-orange-50/30 transition-colors cursor-pointer group">
+								<input
+									ref={fileInputRef}
+									type="file"
+									accept="image/*,video/*"
+									multiple
+									hidden
+									onChange={handleMediaInputChange}
+								/>
+								<div
+									className="border-2 border-dashed border-[#dee0e3] dark:border-gray-700 rounded-xl p-10 flex flex-col items-center justify-center gap-3 bg-gray-50/30 dark:bg-gray-800/30 hover:bg-orange-50/30 transition-colors cursor-pointer group"
+									role="button"
+									tabIndex={0}
+									onClick={handlePickMediaClick}
+									onKeyDown={(e) => {
+										if (e.key === "Enter" || e.key === " ") handlePickMediaClick();
+									}}
+								>
 									<div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
 										<span className="material-symbols-outlined text-primary text-3xl">add_a_photo</span>
 									</div>
 									<div className="text-center">
 										<p className="text-lg font-bold">Tải ảnh khu vực của bạn</p>
 										<p className="text-[#6b7680] text-sm">
-											Giúp chúng tôi nhận diện môi trường xung quanh (Tối đa 5 ảnh)
+											Giúp chúng tôi nhận diện môi trường xung quanh (Tối đa 5 ảnh/video)
+										</p>
+										<p className="text-[#6b7680] text-xs mt-2 font-medium">
+											Đã chọn: {mediaItems.length}/{MAX_MEDIA_FILES} • Tối đa 20MB/file
 										</p>
 									</div>
 								</div>
+
+								{mediaError && (
+									<p className="mt-4 text-sm font-semibold text-red-600">{mediaError}</p>
+								)}
+
+								{mediaItems.length > 0 && (
+									<div className="mt-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+										{mediaItems.map((it) => (
+											<div
+												key={it.id}
+												className="bg-white dark:bg-gray-900 border border-[#dee0e3] dark:border-gray-700 rounded-xl overflow-hidden shadow-sm"
+											>
+												<div className="w-full aspect-video bg-gray-100 dark:bg-gray-800 flex items-center justify-center overflow-hidden">
+													{it.kind === "video" ? (
+														<video
+															src={it.previewUrl}
+															className="w-full h-full object-cover"
+															controls
+															preload="metadata"
+															muted
+													/>
+													) : (
+														<img
+															src={it.previewUrl}
+															alt={it.file.name}
+															className="w-full h-full object-cover"
+														/>
+													)}
+												</div>
+												<div className="p-3">
+													<p className="text-sm font-bold text-gray-900 dark:text-white truncate">{it.file.name}</p>
+													<p className="text-xs text-[#6b7680] dark:text-gray-400 font-medium">
+														{formatBytes(it.file.size)}
+													</p>
+													<button
+														type="button"
+														className="mt-2 text-xs font-semibold text-red-600 hover:text-red-700"
+														onClick={() => handleRemoveMedia(it.id)}
+													>
+														Xóa
+													</button>
+												</div>
+											</div>
+										))}
+									</div>
+								)}
+
+								{(isUploadingMedia || uploadedMedia.length > 0) && (
+									<div className="mt-6 bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-900/50 p-4 rounded-xl shadow-sm">
+										<p className="text-sm font-bold text-orange-700 dark:text-orange-300">
+											{isUploadingMedia
+												? "Đang upload ảnh/video..."
+												: `Đã upload thành công: ${uploadedMedia.length} file`}
+										</p>
+										{resolvedRequestIdForUpload && (
+											<p className="text-xs text-orange-700/80 dark:text-orange-200/80 font-medium mt-1">
+												RequestId: {resolvedRequestIdForUpload}
+											</p>
+										)}
+									</div>
+								)}
 							</div>
 						</section>
 					</div>

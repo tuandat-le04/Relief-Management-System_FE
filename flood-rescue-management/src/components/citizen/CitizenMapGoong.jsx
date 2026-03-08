@@ -25,7 +25,7 @@ export default function CitizenMapGoong({ initialCoords, onSelectLocation }) {
       style: "https://tiles.goong.io/assets/goong_map_web.json",
       center: initialCoords
         ? [initialCoords.longitude, initialCoords.latitude]
-        : [105.8342, 21.0278], // Hà Nội
+        : [106.6297, 10.8231], // TP.HCM
       zoom: initialCoords ? 15 : 12,
     });
 
