@@ -9,6 +9,7 @@ import EmergencyFAB from "../../components/coordinator/EmergencyFAB";
 import CancelRequestModal from "../../components/coordinator/CancelRequestModal";
 import ClassifyRequestModal from "../../components/coordinator/ClassifyRequestModal";
 import RequestDetailModal from "../../components/coordinator/RequestDetailModal";
+import AssignMissionModal from "../../components/coordinator/AssignMissionModal";
 import useMap from "../../hooks/useMap";
 import "../../assets/styles/coordinator.css";
 import rescueRequestService from "../../services/rescueRequestService";
@@ -27,6 +28,7 @@ const CoordinatorDashboard = () => {
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [classifyModalOpen, setClassifyModalOpen] = useState(false);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
 
   // Map hook
@@ -149,6 +151,7 @@ const CoordinatorDashboard = () => {
   const openCancelModal = (request) => { setSelectedRequest(request); setCancelModalOpen(true); };
   const openClassifyModal = (request) => { setSelectedRequest(request); setClassifyModalOpen(true); };
   const openDetailModal = (request) => { setSelectedRequest(request); setDetailModalOpen(true); };
+  const openAssignModal = (request) => { setSelectedRequest(request); setAssignModalOpen(true); };
 
   // Filtered list
   const filteredRequests = requests.filter((request) => {
@@ -234,6 +237,7 @@ const CoordinatorDashboard = () => {
                   onCancel={openCancelModal}
                   onClassify={openClassifyModal}
                   onDetail={openDetailModal}
+                  onAssign={openAssignModal}
                   onFlyTo={flyToRequest}
                 />
               ))
@@ -263,6 +267,12 @@ const CoordinatorDashboard = () => {
         isOpen={detailModalOpen}
         onClose={() => setDetailModalOpen(false)}
         request={selectedRequest}
+      />
+      <AssignMissionModal
+        isOpen={assignModalOpen}
+        onClose={() => setAssignModalOpen(false)}
+        request={selectedRequest}
+        onSuccess={refreshRequests}
       />
 
       {/* Styles cho map markers và animations */}
