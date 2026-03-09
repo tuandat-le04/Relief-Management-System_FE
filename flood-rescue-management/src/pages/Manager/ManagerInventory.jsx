@@ -1,352 +1,399 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Sidebar from "../../components/manager/Sidebar";
 import {
   Inventory2 as BoxIcon,
-  LocalShipping as ShipIcon,
   Warning as WarningIcon,
   Search as SearchIcon,
-  FilterList as FilterIcon,
-  FileDownload as DownloadIcon,
   Add as AddIcon,
-  MoreVert as MoreIcon,
-  CheckCircle as CheckIcon,
-  Cancel as CancelIcon,
-  AccessTime as ClockIcon,
-  TrendingUp as TrendingUpIcon,
-  TrendingDown as TrendingDownIcon,
   Refresh as RefreshIcon,
   LocalHospital as MedicalIcon,
   Restaurant as FoodIcon,
-  Water as WaterIcon,
-  Checkroom as ClothIcon,
-  Speed as SpeedIcon,
-  Emergency as EmergencyIcon,
+  WaterDrop as WaterIcon,
+  Close as CloseIcon,
+  TrendingUp as TrendingUpIcon,
+  TrendingDown as TrendingDownIcon,
+  VolunteerActivism as DistributeIcon,
+  LocationOn as LocationIcon,
+  Warehouse as WarehouseIcon,
+  CheckCircle as CheckCircleIcon,
+  Lock as LockIcon,
+  PauseCircle as PauseIcon,
 } from "@mui/icons-material";
 import {
   getAllWarehouses,
+  createWarehouse,
   getWarehouseInventory,
   inventoryIn,
   inventoryOut,
+  createReliefDistribution,
 } from "../../services/warehouseService";
+import { getActiveItems } from "../../services/adminCatalogService";
+
+// ==================== CONFIG ====================
+
+const ITEM_TYPE_CONFIG = {
+  FOOD: {
+    label: "Thuc pham",
+    smallIcon: null,
+    bigIcon: null,
+    iconBg: "bg-gradient-to-br from-orange-500 to-amber-600",
+    textColor: "text-orange-600",
+    badgeStyle: "bg-orange-50 text-orange-700 border-orange-200",
+    statsBorder: "border-orange-200 hover:border-orange-300",
+  },
+  DRINK: {
+    label: "Nuoc uong",
+    smallIcon: null,
+    bigIcon: null,
+    iconBg: "bg-gradient-to-br from-cyan-500 to-blue-600",
+    textColor: "text-cyan-600",
+    badgeStyle: "bg-cyan-50 text-cyan-700 border-cyan-200",
+    statsBorder: "border-cyan-200 hover:border-cyan-300",
+  },
+  MEDICAL_SUPPLIES: {
+    label: "Vat tu y te",
+    smallIcon: null,
+    bigIcon: null,
+    iconBg: "bg-gradient-to-br from-red-500 to-pink-600",
+    textColor: "text-red-600",
+    badgeStyle: "bg-red-50 text-red-700 border-red-200",
+    statsBorder: "border-red-200 hover:border-red-300",
+  },
+};
+
+const WAREHOUSE_STATUS_CONFIG = {
+  ACTIVE: {
+    label: "Hoat dong",
+    style: "bg-emerald-100 text-emerald-700",
+  },
+  INACTIVE: {
+    label: "Tam ngung",
+    style: "bg-slate-100 text-slate-600",
+  },
+  LOCKED: {
+    label: "Bi khoa",
+    style: "bg-red-100 text-red-700",
+  },
+};
+
+// ==================== ITEM TYPE ICON COMPONENT ====================
+
+function ItemTypeIcon({ itemType, size = 16 }) {
+  if (itemType === "FOOD") return <FoodIcon sx={{ fontSize: size }} />;
+  if (itemType === "DRINK") return <WaterIcon sx={{ fontSize: size }} />;
+  if (itemType === "MEDICAL_SUPPLIES")
+    return <MedicalIcon sx={{ fontSize: size }} />;
+  return <BoxIcon sx={{ fontSize: size }} />;
+}
+
+// ==================== MODAL COMPONENT ====================
+
+function Modal({ open, onClose, title, children }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-6 border-b border-slate-100">
+          <h3 className="text-xl font-bold text-slate-900">{title}</h3>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-slate-100 rounded-xl transition-colors"
+          >
+            <CloseIcon sx={{ fontSize: 20 }} className="text-slate-600" />
+          </button>
+        </div>
+        <div className="p-6">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// ==================== MAIN COMPONENT ====================
 
 export default function ManagerInventory() {
-  const [selectedWarehouse, setSelectedWarehouse] = useState("all");
-  const [searchQuery, setSearchQuery] = useState("");
+  // ---------- State ----------
   const [warehouses, setWarehouses] = useState([]);
-  const [inventoryItems, setInventoryItems] = useState([]);
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState(null);
+  const [inventoryData, setInventoryData] = useState(null);
+  const [catalogItems, setCatalogItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [inventoryLoading, setInventoryLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [toast, setToast] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  // Fetch warehouses và inventory khi component mount
+  // ---------- Modal states ----------
+  const [showCreateWarehouseModal, setShowCreateWarehouseModal] =
+    useState(false);
+  const [showInventoryInModal, setShowInventoryInModal] = useState(false);
+  const [showInventoryOutModal, setShowInventoryOutModal] = useState(false);
+  const [showReliefDistModal, setShowReliefDistModal] = useState(false);
+
+  // ---------- Form states ----------
+  const [createWarehouseForm, setCreateWarehouseForm] = useState({
+    userId: "",
+    resourceId: "",
+    supplyId: "",
+    status: "ACTIVE",
+    latitude: "",
+    longitude: "",
+    address: "",
+  });
+  const [inventoryInForm, setInventoryInForm] = useState({
+    itemId: "",
+    quantity: "",
+  });
+  const [inventoryOutForm, setInventoryOutForm] = useState({
+    itemId: "",
+    quantity: "",
+  });
+  const [reliefDistForm, setReliefDistForm] = useState({
+    missionId: "",
+    inventoryId: "",
+    quantity: "",
+    householdIdentifier: "",
+    isConfirmed: false,
+  });
+
+  // ==================== EFFECTS ====================
+
   useEffect(() => {
-    fetchWarehouses();
+    fetchInitialData();
+    try {
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      if (user?.id) setCreateWarehouseForm((f) => ({ ...f, userId: user.id }));
+    } catch (_) {}
   }, []);
 
-  // Fetch inventory khi warehouse được chọn thay đổi
   useEffect(() => {
-    if (selectedWarehouse && selectedWarehouse !== "all") {
-      fetchInventory(selectedWarehouse);
-    }
-  }, [selectedWarehouse]);
+    if (selectedWarehouseId) fetchInventory(selectedWarehouseId);
+  }, [selectedWarehouseId]);
 
-  // Lấy danh sách warehouses
-  const fetchWarehouses = async () => {
+  useEffect(() => {
+    if (toast) {
+      const t = setTimeout(() => setToast(null), 3500);
+      return () => clearTimeout(t);
+    }
+  }, [toast]);
+
+  // ==================== DATA FETCHING ====================
+
+  const fetchInitialData = async () => {
     try {
       setLoading(true);
-      const response = await getAllWarehouses();
-      if (response.success) {
-        setWarehouses(response.data);
-        // Nếu có warehouse, lấy inventory của warehouse đầu tiên
-        if (response.data.length > 0 && selectedWarehouse === "all") {
-          fetchInventory(response.data[0].id);
+      setError(null);
+      const [warehousesRes, catalogRes] = await Promise.all([
+        getAllWarehouses(),
+        getActiveItems(),
+      ]);
+      if (warehousesRes.success) {
+        setWarehouses(warehousesRes.data);
+        if (warehousesRes.data.length > 0) {
+          setSelectedWarehouseId(warehousesRes.data[0].id);
         }
       }
+      if (catalogRes.success) {
+        setCatalogItems(catalogRes.data);
+      }
     } catch (err) {
-      setError("Không thể tải danh sách kho");
+      setError("Khong the tai du lieu. Vui long thu lai.");
       console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
-  // Lấy inventory của warehouse
   const fetchInventory = async (warehouseId) => {
     try {
-      setLoading(true);
+      setInventoryLoading(true);
       const response = await getWarehouseInventory(warehouseId);
-      if (response.success) {
-        // Transform API data to match component's expected format
-        const transformedItems = response.data.items.map((item) => ({
-          id: item.itemId,
-          name: item.itemName,
-          category: getCategoryByItemName(item.itemName),
-          warehouse: getWarehouseName(warehouseId),
-          quantity: item.quantity,
-          unit: getUnitByItemName(item.itemName),
-          status: getStatusByQuantity(item.quantity),
-          lastUpdate: "Vừa cập nhật",
-          icon: getIconByItemName(item.itemName),
-          iconColor: getColorByItemName(item.itemName),
-        }));
-        setInventoryItems(transformedItems);
-      }
+      if (response.success) setInventoryData(response.data);
     } catch (err) {
-      setError("Không thể tải inventory");
-      console.error(err);
+      console.error("Loi tai ton kho:", err);
+      setInventoryData(null);
     } finally {
-      setLoading(false);
+      setInventoryLoading(false);
     }
   };
 
-  // Helper functions to transform data
-  const getWarehouseName = (warehouseId) => {
-    const warehouse = warehouses.find((w) => w.id === warehouseId);
-    return warehouse ? warehouse.resourceId : "Kho không xác định";
-  };
+  // ==================== HELPERS ====================
 
-  const getCategoryByItemName = (itemName) => {
-    if (
-      itemName.toLowerCase().includes("gạo") ||
-      itemName.toLowerCase().includes("mì")
-    ) {
-      return "Lương thực";
-    } else if (itemName.toLowerCase().includes("nước")) {
-      return "Nhu yếu phẩm";
-    } else if (
-      itemName.toLowerCase().includes("thuốc") ||
-      itemName.toLowerCase().includes("vaccine")
-    ) {
-      return "Y tế";
-    } else {
-      return "Vật dụng";
+  const getCatalogItem = useCallback(
+    (itemId) => catalogItems.find((c) => c.id === itemId),
+    [catalogItems],
+  );
+
+  const getItemTypeConfig = useCallback(
+    (itemId) => {
+      const c = getCatalogItem(itemId);
+      return c ? ITEM_TYPE_CONFIG[c.itemType] : null;
+    },
+    [getCatalogItem],
+  );
+
+  const showToast = (type, message) => setToast({ type, message });
+
+  const selectedWarehouse = warehouses.find(
+    (w) => w.id === selectedWarehouseId,
+  );
+
+  // ==================== STATS ====================
+
+  const inventoryStats = useMemo(() => {
+    const grouped = {};
+    Object.keys(ITEM_TYPE_CONFIG).forEach((type) => {
+      grouped[type] = { totalQuantity: 0, itemCount: 0 };
+    });
+    if (inventoryData?.items) {
+      inventoryData.items.forEach((item) => {
+        const c = catalogItems.find((cat) => cat.id === item.itemId);
+        if (c && grouped[c.itemType] !== undefined) {
+          grouped[c.itemType].totalQuantity += item.quantity;
+          grouped[c.itemType].itemCount += 1;
+        }
+      });
     }
-  };
-
-  const getUnitByItemName = (itemName) => {
-    if (itemName.toLowerCase().includes("gạo")) return "bao";
-    if (itemName.toLowerCase().includes("nước")) return "thùng";
-    if (itemName.toLowerCase().includes("mì")) return "thùng";
-    if (itemName.toLowerCase().includes("vaccine")) return "liều";
-    return "cái";
-  };
-
-  const getStatusByQuantity = (quantity) => {
-    if (quantity < 50) return "critical";
-    if (quantity < 100) return "warning";
-    return "good";
-  };
-
-  const getIconByItemName = (itemName) => {
-    if (
-      itemName.toLowerCase().includes("gạo") ||
-      itemName.toLowerCase().includes("mì")
-    ) {
-      return <FoodIcon sx={{ fontSize: 20 }} />;
-    } else if (itemName.toLowerCase().includes("nước")) {
-      return <WaterIcon sx={{ fontSize: 20 }} />;
-    } else if (
-      itemName.toLowerCase().includes("thuốc") ||
-      itemName.toLowerCase().includes("vaccine")
-    ) {
-      return <MedicalIcon sx={{ fontSize: 20 }} />;
-    } else {
-      return <BoxIcon sx={{ fontSize: 20 }} />;
-    }
-  };
-
-  const getColorByItemName = (itemName) => {
-    if (
-      itemName.toLowerCase().includes("gạo") ||
-      itemName.toLowerCase().includes("mì")
-    ) {
-      return "text-blue-500";
-    } else if (itemName.toLowerCase().includes("nước")) {
-      return "text-cyan-500";
-    } else if (
-      itemName.toLowerCase().includes("thuốc") ||
-      itemName.toLowerCase().includes("vaccine")
-    ) {
-      return "text-red-500";
-    } else {
-      return "text-slate-500";
-    }
-  };
-
-  // Xử lý nhập kho
-  const handleInventoryIn = async (warehouseId, itemId, quantity) => {
-    try {
-      const response = await inventoryIn(warehouseId, { itemId, quantity });
-      if (response.success) {
-        // Refresh inventory sau khi nhập kho thành công
-        fetchInventory(warehouseId);
-        alert("Nhập kho thành công!");
-      }
-    } catch (err) {
-      alert("Lỗi khi nhập kho: " + err.message);
-      console.error(err);
-    }
-  };
-
-  // Xử lý xuất kho
-  const handleInventoryOut = async (warehouseId, itemId, quantity) => {
-    try {
-      const response = await inventoryOut(warehouseId, { itemId, quantity });
-      if (response.success) {
-        // Refresh inventory sau khi xuất kho thành công
-        fetchInventory(warehouseId);
-        alert("Xuất kho thành công!");
-      }
-    } catch (err) {
-      alert("Lỗi khi xuất kho: " + err.message);
-      console.error(err);
-    }
-  };
-
-  // Stats data for main categories (tính toán từ inventory items)
-  const inventoryStats = [
-    {
-      title: "Gạo & Lương Khô",
-      value: inventoryItems
-        .filter(
-          (item) =>
-            item.name.toLowerCase().includes("gạo") ||
-            item.name.toLowerCase().includes("mì"),
-        )
-        .reduce((acc, item) => acc + item.quantity, 0)
-        .toString(),
-      unit: "Bao/Thùng",
-      percentage: 85,
-      status: "good",
-      change: "+2.5",
-      icon: <FoodIcon sx={{ fontSize: 28 }} />,
-      iconBg: "bg-gradient-to-br from-blue-500 to-indigo-600",
-      remaining: "Ổn định",
-    },
-    {
-      title: "Nước Sạch",
-      value: inventoryItems
-        .filter((item) => item.name.toLowerCase().includes("nước"))
-        .reduce((acc, item) => acc + item.quantity, 0)
-        .toString(),
-      unit: "Thùng",
-      percentage: 60,
-      status: "normal",
-      change: "+400",
-      icon: <WaterIcon sx={{ fontSize: 28 }} />,
-      iconBg: "bg-gradient-to-br from-cyan-500 to-blue-600",
-      remaining: "Ổn định",
-    },
-    {
-      title: "Mì Tôm & Đồ Hộp",
-      value: inventoryItems
-        .filter(
-          (item) =>
-            item.name.toLowerCase().includes("mì") ||
-            item.name.toLowerCase().includes("hộp"),
-        )
-        .reduce((acc, item) => acc + item.quantity, 0)
-        .toString(),
-      unit: "Thùng",
-      percentage: 42,
-      status: "warning",
-      change: "-300",
-      icon: <BoxIcon sx={{ fontSize: 28 }} />,
-      iconBg: "bg-gradient-to-br from-amber-500 to-orange-600",
-      remaining: "Cần bổ sung",
-    },
-    {
-      title: "Thuốc & Y Tế",
-      value: inventoryItems
-        .filter(
-          (item) =>
-            item.name.toLowerCase().includes("thuốc") ||
-            item.name.toLowerCase().includes("vaccine"),
-        )
-        .reduce((acc, item) => acc + item.quantity, 0)
-        .toString(),
-      unit: "Liều/Hộp",
-      percentage: 15,
-      status: "critical",
-      change: "-50",
-      icon: <MedicalIcon sx={{ fontSize: 28 }} />,
-      iconBg: "bg-gradient-to-br from-red-500 to-pink-600",
-      remaining: "KHẨN CẤP",
-    },
-  ];
-
-  // Pending requests data (giữ nguyên mock data vì chưa có API)
-  const [pendingRequests] = useState([
-    {
-      id: 1,
-      requester: "Điều phối viên An",
-      location: "Khu vực A - Xã Hòa Vang",
-      items: [
-        { name: "Gạo", quantity: "500 kg" },
-        { name: "Nước sạch", quantity: "200 thùng" },
-      ],
-      time: "10p trước",
-      priority: "normal",
-      avatar: "A1",
-    },
-    {
-      id: 2,
-      requester: "Trạm Y Tế B",
-      location: "Khu vực B - Huyện Lệ Thủy",
-      items: [
-        { name: "Thuốc hạ sốt", quantity: "50 hộp" },
-        { name: "Băng gạc", quantity: "100 cuộn" },
-      ],
-      time: "35p trước",
-      priority: "urgent",
-      avatar: "B2",
-    },
-    {
-      id: 3,
-      requester: "Tình nguyện viên Tuấn",
-      location: "Khu vực C - Vùng Cô Lập",
-      items: [
-        { name: "Áo phao", quantity: "20 cái" },
-        { name: "Đèn pin", quantity: "15 cái" },
-      ],
-      time: "1h trước",
-      priority: "normal",
-      avatar: "C5",
-    },
-  ]);
-
-  // Critical items (tính toán từ inventory items)
-  const criticalItems = inventoryItems
-    .filter((item) => item.status === "critical")
-    .slice(0, 3)
-    .map((item) => ({
-      id: item.id,
-      name: item.name,
-      remaining: `${item.quantity} ${item.unit}`,
-      icon: item.icon,
+    return Object.entries(ITEM_TYPE_CONFIG).map(([type, config]) => ({
+      type,
+      ...config,
+      ...grouped[type],
     }));
+  }, [inventoryData, catalogItems]);
 
-  const getStatusColor = (percentage) => {
-    if (percentage >= 70) return "bg-emerald-500";
-    if (percentage >= 40) return "bg-amber-500";
-    return "bg-red-500";
+  // ==================== FILTERED LIST ====================
+
+  const filteredItems = useMemo(() => {
+    if (!inventoryData?.items) return [];
+    return inventoryData.items.filter((item) =>
+      item.itemName.toLowerCase().includes(searchQuery.toLowerCase()),
+    );
+  }, [inventoryData, searchQuery]);
+
+  const lowStockItems = useMemo(() => {
+    if (!inventoryData?.items) return [];
+    return inventoryData.items.filter((item) => item.quantity < 50);
+  }, [inventoryData]);
+
+  // ==================== ACTION HANDLERS ====================
+
+  const handleInventoryIn = async (e) => {
+    e.preventDefault();
+    if (!selectedWarehouseId) return;
+    try {
+      setSubmitting(true);
+      const response = await inventoryIn(selectedWarehouseId, {
+        itemId: Number(inventoryInForm.itemId),
+        quantity: Number(inventoryInForm.quantity),
+      });
+      if (response.success) {
+        setInventoryData(response.data);
+        setShowInventoryInModal(false);
+        setInventoryInForm({ itemId: "", quantity: "" });
+        showToast("success", "Nhap kho thanh cong!");
+      }
+    } catch (err) {
+      showToast("error", err.response?.data?.message || "Loi khi nhap kho!");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const getStatusBadge = (status) => {
-    const styles = {
-      good: "bg-emerald-50 text-emerald-700 border-emerald-200",
-      warning: "bg-amber-50 text-amber-700 border-amber-200",
-      critical: "bg-red-50 text-red-700 border-red-200",
-    };
-    const labels = {
-      good: "Sẵn sàng",
-      warning: "Sắp hết",
-      critical: "Cảnh báo thấp",
-    };
-    return {
-      style: styles[status] || styles.good,
-      label: labels[status] || status,
-    };
+  const handleInventoryOut = async (e) => {
+    e.preventDefault();
+    if (!selectedWarehouseId) return;
+    try {
+      setSubmitting(true);
+      const response = await inventoryOut(selectedWarehouseId, {
+        itemId: Number(inventoryOutForm.itemId),
+        quantity: Number(inventoryOutForm.quantity),
+      });
+      if (response.success) {
+        setInventoryData(response.data);
+        setShowInventoryOutModal(false);
+        setInventoryOutForm({ itemId: "", quantity: "" });
+        showToast("success", "Xuat kho thanh cong!");
+      }
+    } catch (err) {
+      showToast("error", err.response?.data?.message || "Loi khi xuat kho!");
+    } finally {
+      setSubmitting(false);
+    }
   };
+
+  const handleCreateWarehouse = async (e) => {
+    e.preventDefault();
+    try {
+      setSubmitting(true);
+      const response = await createWarehouse({
+        ...createWarehouseForm,
+        userId: Number(createWarehouseForm.userId),
+        latitude: parseFloat(createWarehouseForm.latitude),
+        longitude: parseFloat(createWarehouseForm.longitude),
+      });
+      if (response.success) {
+        setWarehouses((prev) => [...prev, response.data]);
+        setShowCreateWarehouseModal(false);
+        setCreateWarehouseForm({
+          userId: "",
+          resourceId: "",
+          supplyId: "",
+          status: "ACTIVE",
+          latitude: "",
+          longitude: "",
+          address: "",
+        });
+        showToast("success", "Tao kho moi thanh cong!");
+      }
+    } catch (err) {
+      showToast("error", err.response?.data?.message || "Loi khi tao kho!");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleReliefDistribution = async (e) => {
+    e.preventDefault();
+    try {
+      setSubmitting(true);
+      const response = await createReliefDistribution({
+        missionId: Number(reliefDistForm.missionId),
+        inventoryId: Number(reliefDistForm.inventoryId),
+        quantity: Number(reliefDistForm.quantity),
+        householdIdentifier: reliefDistForm.householdIdentifier,
+        isConfirmed: reliefDistForm.isConfirmed,
+      });
+      if (response.success) {
+        fetchInventory(selectedWarehouseId);
+        setShowReliefDistModal(false);
+        setReliefDistForm({
+          missionId: "",
+          inventoryId: "",
+          quantity: "",
+          householdIdentifier: "",
+          isConfirmed: false,
+        });
+        showToast("success", "Ghi nhan phan phoi cuu tro thanh cong!");
+      }
+    } catch (err) {
+      showToast(
+        "error",
+        err.response?.data?.message || "Loi khi phan phoi cuu tro!",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ==================== RENDER ====================
+
+  const inputClass =
+    "w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all";
+  const labelClass = "block text-sm font-semibold text-slate-700 mb-1.5";
 
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
@@ -354,7 +401,34 @@ export default function ManagerInventory() {
 
       <div className="flex-1 overflow-auto">
         <div className="p-8 max-w-[1800px] mx-auto">
-          {/* Loading State */}
+          {/* Toast Notification */}
+          {toast && (
+            <div
+              className={`fixed top-6 right-6 z-[100] flex items-center gap-3 px-5 py-4 rounded-2xl shadow-2xl border text-sm font-semibold transition-all duration-300 ${
+                toast.type === "success"
+                  ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+                  : "bg-red-50 border-red-200 text-red-800"
+              }`}
+            >
+              {toast.type === "success" ? (
+                <CheckCircleIcon
+                  sx={{ fontSize: 20 }}
+                  className="text-emerald-600"
+                />
+              ) : (
+                <WarningIcon sx={{ fontSize: 20 }} className="text-red-600" />
+              )}
+              {toast.message}
+              <button
+                onClick={() => setToast(null)}
+                className="ml-2 p-1 hover:bg-black/10 rounded-lg"
+              >
+                <CloseIcon sx={{ fontSize: 16 }} />
+              </button>
+            </div>
+          )}
+
+          {/* Loading */}
           {loading && (
             <div className="flex items-center justify-center h-64">
               <div className="text-center">
@@ -363,26 +437,26 @@ export default function ManagerInventory() {
                   className="text-blue-500 animate-spin mb-4"
                 />
                 <p className="text-slate-600 font-semibold">
-                  Đang tải dữ liệu...
+                  Dang tai du lieu...
                 </p>
               </div>
             </div>
           )}
 
-          {/* Error State */}
+          {/* Error */}
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-3xl p-6 mb-6">
               <div className="flex items-center gap-3">
                 <WarningIcon sx={{ fontSize: 24 }} className="text-red-600" />
                 <div>
-                  <h3 className="font-bold text-red-900">Lỗi</h3>
+                  <h3 className="font-bold text-red-900">Loi tai du lieu</h3>
                   <p className="text-sm text-red-700">{error}</p>
                 </div>
                 <button
-                  onClick={fetchWarehouses}
-                  className="ml-auto px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors"
+                  onClick={fetchInitialData}
+                  className="ml-auto px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors text-sm font-semibold"
                 >
-                  Thử lại
+                  Thu lai
                 </button>
               </div>
             </div>
@@ -390,16 +464,17 @@ export default function ManagerInventory() {
 
           {!loading && !error && (
             <>
-              {/* Header */}
+              {/* HEADER */}
               <div className="mb-8">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="space-y-2">
-                    <h1 className="text-5xl font-bold text-slate-900 tracking-tight">
-                      Quản Lý Kho Hàng
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-2">
+                  <div>
+                    <h1 className="text-4xl font-bold text-slate-900 tracking-tight">
+                      Quan Ly Kho Hang
                     </h1>
-                    <p className="text-slate-600 text-base">
-                      Theo dõi, điều phối và kiểm soát hàng cứu trợ tập trung •
-                      <span className="text-slate-900 font-semibold ml-1">
+                    <p className="text-slate-500 text-sm mt-1">
+                      Theo doi ton kho · Nhap/Xuat hang · Phan phoi cuu tro
+                      &bull;{" "}
+                      <span className="text-slate-700 font-semibold">
                         {new Date().toLocaleDateString("vi-VN", {
                           weekday: "long",
                           year: "numeric",
@@ -410,351 +485,350 @@ export default function ManagerInventory() {
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
-                      onClick={() => fetchWarehouses()}
-                      className="flex items-center gap-2 px-5 py-3 bg-white hover:bg-slate-50 border border-slate-200 rounded-2xl text-slate-700 font-semibold transition-all duration-300 shadow-sm hover:shadow-lg"
+                      onClick={fetchInitialData}
+                      className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-semibold text-sm transition-all shadow-sm hover:shadow"
                     >
-                      <RefreshIcon sx={{ fontSize: 20 }} />
-                      <span>Làm mới</span>
+                      <RefreshIcon sx={{ fontSize: 18 }} />
+                      Lam moi
                     </button>
-                    <button className="flex items-center gap-2 px-5 py-3 bg-white hover:bg-orange-50 border-2 border-orange-300 rounded-2xl text-orange-600 font-semibold transition-all duration-300 shadow-sm hover:shadow-lg">
-                      <EmergencyIcon sx={{ fontSize: 20 }} />
-                      <span>Xuất kho khẩn cấp</span>
+                    <button
+                      onClick={() => setShowCreateWarehouseModal(true)}
+                      className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-violet-50 border border-violet-300 rounded-xl text-violet-700 font-semibold text-sm transition-all shadow-sm hover:shadow"
+                    >
+                      <WarehouseIcon sx={{ fontSize: 18 }} />
+                      Tao kho moi
                     </button>
-                    <button className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all duration-300 font-semibold">
-                      <AddIcon sx={{ fontSize: 20 }} />
-                      <span>Nhập kho mới</span>
+                    <button
+                      onClick={() => {
+                        if (!selectedWarehouseId) {
+                          showToast("error", "Vui long chon kho truoc!");
+                          return;
+                        }
+                        setShowInventoryOutModal(true);
+                      }}
+                      className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-amber-50 border border-amber-300 rounded-xl text-amber-700 font-semibold text-sm transition-all shadow-sm hover:shadow"
+                    >
+                      <TrendingDownIcon sx={{ fontSize: 18 }} />
+                      Xuat kho
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (!selectedWarehouseId) {
+                          showToast("error", "Vui long chon kho truoc!");
+                          return;
+                        }
+                        setShowInventoryInModal(true);
+                      }}
+                      className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-semibold text-sm transition-all shadow-lg shadow-emerald-500/20"
+                    >
+                      <TrendingUpIcon sx={{ fontSize: 18 }} />
+                      Nhap kho
+                    </button>
+                    <button
+                      onClick={() => setShowReliefDistModal(true)}
+                      className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-semibold text-sm transition-all shadow-lg shadow-blue-500/20"
+                    >
+                      <DistributeIcon sx={{ fontSize: 18 }} />
+                      Phan phoi cuu tro
                     </button>
                   </div>
                 </div>
               </div>
 
-              {/* Stats Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                {inventoryStats.map((stat, index) => (
-                  <div
-                    key={index}
-                    className={`group relative bg-white rounded-3xl p-6 shadow-sm hover:shadow-xl border-2 transition-all duration-500 overflow-hidden ${
-                      stat.status === "critical"
-                        ? "border-red-200 hover:border-red-300"
-                        : stat.status === "warning"
-                          ? "border-amber-200 hover:border-amber-300"
-                          : "border-slate-200 hover:border-slate-300"
-                    }`}
-                  >
-                    {/* Background gradient effect */}
-                    <div
-                      className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 ${
-                        stat.status === "critical"
-                          ? "bg-gradient-to-br from-red-50 to-transparent"
-                          : stat.status === "warning"
-                            ? "bg-gradient-to-br from-amber-50 to-transparent"
-                            : "bg-gradient-to-br from-slate-50 to-transparent"
-                      }`}
-                    ></div>
-
-                    {stat.status === "critical" && (
-                      <div className="absolute top-4 right-4">
-                        <span className="relative flex h-3 w-3">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-                        </span>
-                      </div>
-                    )}
-
-                    <div className="relative">
-                      <div className="flex items-start justify-between mb-4">
-                        <div
-                          className={`p-3.5 rounded-2xl ${stat.iconBg} shadow-lg shadow-black/10 text-white transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-500`}
-                        >
-                          {stat.icon}
-                        </div>
-                      </div>
-
-                      <div className="space-y-1 mb-4">
-                        <h3 className="text-4xl font-bold text-slate-900 tracking-tight">
-                          {stat.value}
-                          <span className="text-lg font-semibold text-slate-500 ml-1">
-                            {stat.unit}
-                          </span>
-                        </h3>
-                        <p className="text-sm font-semibold text-slate-900">
-                          {stat.title}
-                        </p>
-                        <div className="flex items-center gap-2">
+              {/* STATS CARDS */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+                {/* Warehouses count */}
+                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-lg transition-all">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-3 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 text-white shadow-lg shadow-purple-500/20">
+                      <WarehouseIcon sx={{ fontSize: 24 }} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                        Tong so kho
+                      </p>
+                      <p className="text-3xl font-bold text-slate-900">
+                        {warehouses.length}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {Object.entries(WAREHOUSE_STATUS_CONFIG).map(
+                      ([status, cfg]) => {
+                        const count = warehouses.filter(
+                          (w) => w.status === status,
+                        ).length;
+                        if (count === 0) return null;
+                        return (
                           <span
-                            className={`text-xs font-bold ${
-                              stat.status === "critical"
-                                ? "text-red-600"
-                                : stat.status === "warning"
-                                  ? "text-amber-600"
-                                  : "text-emerald-600"
-                            }`}
+                            key={status}
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-semibold ${cfg.style}`}
                           >
-                            {stat.percentage}% Sức chứa
+                            {count} {cfg.label}
                           </span>
-                          <span className="text-xs text-slate-500">
-                            • {stat.remaining}
-                          </span>
-                        </div>
-                      </div>
+                        );
+                      },
+                    )}
+                  </div>
+                </div>
 
-                      {/* Progress bar */}
-                      <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all duration-700 ${getStatusColor(stat.percentage)}`}
-                          style={{ width: `${stat.percentage}%` }}
-                        ></div>
+                {/* ItemType stats */}
+                {inventoryStats.map((stat) => (
+                  <div
+                    key={stat.type}
+                    className={`bg-white rounded-2xl p-5 border-2 shadow-sm hover:shadow-lg transition-all ${stat.statsBorder}`}
+                  >
+                    <div className="flex items-center gap-3 mb-3">
+                      <div
+                        className={`p-3 rounded-xl ${stat.iconBg} text-white shadow-lg shadow-black/10`}
+                      >
+                        <ItemTypeIcon itemType={stat.type} size={28} />
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                          {stat.label}
+                        </p>
+                        <p className={`text-3xl font-bold ${stat.textColor}`}>
+                          {stat.totalQuantity.toLocaleString()}
+                        </p>
                       </div>
                     </div>
+                    <p className="text-xs text-slate-500">
+                      <span className="font-semibold text-slate-700">
+                        {stat.itemCount}
+                      </span>{" "}
+                      loai hang hoa trong kho duoc chon
+                    </p>
                   </div>
                 ))}
               </div>
 
-              {/* Main Content Grid */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-                {/* Pending Requests Column */}
-                <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[600px]">
-                  <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-transparent shrink-0">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="p-3 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 text-white shadow-lg shadow-purple-500/20">
-                          <ClockIcon sx={{ fontSize: 24 }} />
-                        </div>
-                        <div>
-                          <h2 className="text-xl font-bold text-slate-900">
-                            Yêu cầu chờ duyệt
-                          </h2>
-                          <p className="text-sm text-slate-600 mt-0.5">
-                            {pendingRequests.length} yêu cầu đang chờ
-                          </p>
-                        </div>
+              {/* WAREHOUSE TABS + INVENTORY TABLE */}
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden mb-6">
+                <div className="p-5 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-transparent">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/20">
+                        <BoxIcon sx={{ fontSize: 22 }} />
                       </div>
-                      <span className="px-3 py-1.5 bg-purple-100 text-purple-700 rounded-xl text-sm font-bold">
-                        {pendingRequests.length}
-                      </span>
+                      <div>
+                        <h2 className="text-lg font-bold text-slate-900">
+                          Ton kho chi tiet
+                        </h2>
+                        {selectedWarehouse && (
+                          <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+                            <LocationIcon sx={{ fontSize: 12 }} />
+                            {selectedWarehouse.address}
+                            <span
+                              className={`ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold ${WAREHOUSE_STATUS_CONFIG[selectedWarehouse.status]?.style}`}
+                            >
+                              {
+                                WAREHOUSE_STATUS_CONFIG[
+                                  selectedWarehouse.status
+                                ]?.label
+                              }
+                            </span>
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="relative w-full sm:w-64">
+                      <SearchIcon
+                        sx={{ fontSize: 16 }}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Tim kiem hang hoa..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                      />
                     </div>
                   </div>
 
-                  <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                    {pendingRequests.map((request) => (
-                      <div
-                        key={request.id}
-                        className={`group p-5 rounded-2xl border-2 transition-all duration-300 ${
-                          request.priority === "urgent"
-                            ? "bg-red-50/50 border-red-200 hover:border-red-300 hover:bg-red-50"
-                            : "bg-slate-50 border-slate-200 hover:border-blue-300 hover:bg-blue-50/50"
+                  {/* Warehouse tabs */}
+                  <div className="flex flex-wrap gap-2">
+                    {warehouses.map((wh) => (
+                      <button
+                        key={wh.id}
+                        onClick={() => setSelectedWarehouseId(wh.id)}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200 ${
+                          selectedWarehouseId === wh.id
+                            ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20"
+                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                         }`}
                       >
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center text-xs font-bold text-white border-2 border-slate-300 shadow-lg">
-                              {request.avatar}
-                            </div>
-                            <div>
-                              <p className="text-sm font-bold text-slate-900">
-                                {request.requester}
-                              </p>
-                              <p className="text-xs text-slate-600">
-                                {request.location}
-                              </p>
-                            </div>
-                          </div>
-                          <span className="text-[10px] text-slate-500 bg-slate-200 px-2 py-1 rounded-lg font-medium">
-                            {request.time}
+                        <WarehouseIcon sx={{ fontSize: 14 }} />
+                        <span
+                          className="max-w-[150px] truncate"
+                          title={wh.address}
+                        >
+                          {wh.resourceId || wh.address || `Kho #${wh.id}`}
+                        </span>
+                        {wh.status !== "ACTIVE" && (
+                          <span
+                            className={`px-1 py-0.5 rounded text-[10px] font-bold ${WAREHOUSE_STATUS_CONFIG[wh.status]?.style}`}
+                          >
+                            {WAREHOUSE_STATUS_CONFIG[wh.status]?.label}
                           </span>
-                        </div>
-
-                        <div className="bg-white/60 backdrop-blur-sm p-3 rounded-xl mb-3 space-y-1.5 border border-slate-200">
-                          {request.items.map((item, idx) => (
-                            <div
-                              key={idx}
-                              className="flex justify-between text-xs"
-                            >
-                              <span
-                                className={`font-medium ${request.priority === "urgent" ? "text-red-700" : "text-slate-600"}`}
-                              >
-                                {item.name}:
-                              </span>
-                              <span className="text-slate-900 font-bold">
-                                {item.quantity}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-
-                        <div className="flex gap-2">
-                          <button className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 shadow-lg shadow-blue-500/20">
-                            <CheckIcon sx={{ fontSize: 16 }} />
-                            Duyệt xuất kho
-                          </button>
-                          <button className="px-4 py-2.5 text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900 rounded-xl transition-all duration-300">
-                            <CancelIcon sx={{ fontSize: 16 }} />
-                          </button>
-                        </div>
-                      </div>
+                        )}
+                      </button>
                     ))}
+                    {warehouses.length === 0 && (
+                      <p className="text-sm text-slate-400 italic">
+                        Chua co kho nao. Hay tao kho moi.
+                      </p>
+                    )}
                   </div>
                 </div>
 
-                {/* Inventory Table Column */}
-                <div className="lg:col-span-2 bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[600px]">
-                  <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-transparent shrink-0">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-4">
-                        <div className="p-3 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/20">
-                          <BoxIcon sx={{ fontSize: 24 }} />
-                        </div>
-                        <div>
-                          <h2 className="text-xl font-bold text-slate-900">
-                            Danh sách tồn kho theo khu vực
-                          </h2>
-                          <p className="text-sm text-slate-600 mt-0.5">
-                            Quản lý và theo dõi vật tư
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        {/* Warehouse selector */}
-                        <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl">
-                          <button
-                            onClick={() => setSelectedWarehouse("all")}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-300 ${
-                              selectedWarehouse === "all"
-                                ? "bg-white text-slate-900 shadow-sm"
-                                : "text-slate-600 hover:text-slate-900"
-                            }`}
-                          >
-                            Tất cả
-                          </button>
-                          {warehouses.map((warehouse) => (
-                            <button
-                              key={warehouse.id}
-                              onClick={() => setSelectedWarehouse(warehouse.id)}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-300 ${
-                                selectedWarehouse === warehouse.id
-                                  ? "bg-white text-slate-900 shadow-sm"
-                                  : "text-slate-600 hover:text-slate-900"
-                              }`}
-                            >
-                              {warehouse.resourceId}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <div className="relative flex-1">
-                        <SearchIcon
-                          sx={{ fontSize: 18 }}
-                          className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                        />
-                        <input
-                          type="text"
-                          placeholder="Tìm kiếm vật tư..."
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                          className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                        />
-                      </div>
-                      <button className="p-2.5 hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors">
-                        <FilterIcon
-                          sx={{ fontSize: 20 }}
-                          className="text-slate-600"
-                        />
-                      </button>
-                      <button className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-semibold transition-colors shadow-lg shadow-slate-900/20">
-                        <DownloadIcon sx={{ fontSize: 18 }} />
-                        <span>Xuất</span>
-                      </button>
-                    </div>
+                {/* Inventory table */}
+                {inventoryLoading ? (
+                  <div className="flex items-center justify-center py-16">
+                    <RefreshIcon
+                      sx={{ fontSize: 36 }}
+                      className="text-blue-400 animate-spin mr-3"
+                    />
+                    <span className="text-slate-500 font-medium">
+                      Dang tai ton kho...
+                    </span>
                   </div>
-
-                  <div className="overflow-x-auto flex-1">
+                ) : filteredItems.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+                    <BoxIcon
+                      sx={{ fontSize: 48 }}
+                      className="mb-3 opacity-40"
+                    />
+                    <p className="font-semibold">
+                      {searchQuery
+                        ? "Khong tim thay hang hoa phu hop"
+                        : "Kho hien tai chua co hang hoa"}
+                    </p>
+                    {!searchQuery && selectedWarehouseId && (
+                      <button
+                        onClick={() => setShowInventoryInModal(true)}
+                        className="mt-3 flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 transition-colors"
+                      >
+                        <AddIcon sx={{ fontSize: 16 }} /> Nhap hang vao kho
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
                     <table className="w-full">
-                      <thead className="bg-slate-50/50 sticky top-0 z-10">
+                      <thead className="bg-slate-50 border-b border-slate-100">
                         <tr>
-                          <th className="px-6 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">
-                            Tên vật tư
+                          <th className="px-6 py-3.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
+                            Hang hoa
                           </th>
-                          <th className="px-6 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">
-                            Mã Kho
+                          <th className="px-6 py-3.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
+                            Phan loai
                           </th>
-                          <th className="px-6 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">
-                            Tồn kho
+                          <th className="px-6 py-3.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
+                            Don vi / Dung tich
                           </th>
-                          <th className="px-6 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">
-                            Trạng thái
+                          <th className="px-6 py-3.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
+                            Ton kho
                           </th>
-                          <th className="px-6 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">
-                            Cập nhật
+                          <th className="px-6 py-3.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
+                            Trang thai
                           </th>
-                          <th className="px-6 py-4 text-right text-xs font-bold text-slate-600 uppercase tracking-wider">
-                            Thao tác
+                          <th className="px-6 py-3.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
+                            Cap nhat cuoi
                           </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {inventoryItems.map((item, idx) => {
-                          const status = getStatusBadge(item.status);
+                        {filteredItems.map((item) => {
+                          const typeConfig = getItemTypeConfig(item.itemId);
+                          const catalogItem = getCatalogItem(item.itemId);
+                          const isLow = item.quantity < 50;
+                          const isWarning =
+                            item.quantity >= 50 && item.quantity < 100;
                           return (
                             <tr
-                              key={item.id}
-                              className={`hover:bg-slate-50 transition-colors ${
-                                item.status === "critical" ? "bg-red-50/30" : ""
-                              }`}
+                              key={item.itemId}
+                              className={`hover:bg-slate-50 transition-colors ${isLow ? "bg-red-50/40" : ""}`}
                             >
                               <td className="px-6 py-4">
                                 <div className="flex items-center gap-3">
                                   <div
-                                    className={`w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center ${item.iconColor}`}
+                                    className={`w-9 h-9 rounded-xl flex items-center justify-center ${typeConfig ? typeConfig.iconBg : "bg-slate-200"} text-white shadow-sm`}
                                   >
-                                    {item.icon}
+                                    <ItemTypeIcon
+                                      itemType={catalogItem?.itemType}
+                                      size={16}
+                                    />
                                   </div>
                                   <div>
                                     <p className="text-sm font-bold text-slate-900">
-                                      {item.name}
+                                      {item.itemName}
                                     </p>
-                                    <p className="text-xs text-slate-500">
-                                      {item.category}
+                                    <p className="text-xs text-slate-400">
+                                      ID: {item.itemId}
                                     </p>
                                   </div>
                                 </div>
                               </td>
-                              <td className="px-6 py-4 text-sm text-slate-600">
-                                {item.warehouse}
-                              </td>
                               <td className="px-6 py-4">
-                                <p className="text-lg font-bold text-slate-900">
-                                  {item.quantity}
-                                  <span className="text-xs font-normal text-slate-500 ml-1">
-                                    {item.unit}
+                                {typeConfig ? (
+                                  <span
+                                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border ${typeConfig.badgeStyle}`}
+                                  >
+                                    <ItemTypeIcon
+                                      itemType={catalogItem?.itemType}
+                                      size={12}
+                                    />
+                                    {typeConfig.label}
                                   </span>
-                                </p>
+                                ) : (
+                                  <span className="text-xs text-slate-400 italic">
+                                    Khong xac dinh
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-6 py-4 text-sm text-slate-600">
+                                {catalogItem?.capacity || (
+                                  <span className="text-slate-400 italic text-xs">
+                                    -
+                                  </span>
+                                )}
                               </td>
                               <td className="px-6 py-4">
                                 <span
-                                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border ${status.style}`}
+                                  className={`text-xl font-bold ${isLow ? "text-red-600" : isWarning ? "text-amber-600" : "text-slate-900"}`}
                                 >
-                                  {item.status === "critical" && (
-                                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
-                                  )}
-                                  {status.label}
+                                  {item.quantity.toLocaleString()}
                                 </span>
                               </td>
-                              <td className="px-6 py-4 text-xs text-slate-500">
-                                {item.lastUpdate}
+                              <td className="px-6 py-4">
+                                {isLow ? (
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border bg-red-50 text-red-700 border-red-200">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                                    Ton kho thap
+                                  </span>
+                                ) : isWarning ? (
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border bg-amber-50 text-amber-700 border-amber-200">
+                                    Sap het hang
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border bg-emerald-50 text-emerald-700 border-emerald-200">
+                                    San sang
+                                  </span>
+                                )}
                               </td>
-                              <td className="px-6 py-4 text-right">
-                                <button className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
-                                  <MoreIcon
-                                    sx={{ fontSize: 20 }}
-                                    className="text-slate-600"
-                                  />
-                                </button>
+                              <td className="px-6 py-4 text-xs text-slate-500">
+                                {item.lastUpdate ? (
+                                  new Date(item.lastUpdate).toLocaleString(
+                                    "vi-VN",
+                                    { dateStyle: "short", timeStyle: "short" },
+                                  )
+                                ) : (
+                                  <span className="italic">-</span>
+                                )}
                               </td>
                             </tr>
                           );
@@ -762,67 +836,524 @@ export default function ManagerInventory() {
                       </tbody>
                     </table>
                   </div>
-                </div>
-              </div>
+                )}
 
-              {/* Critical Items Alert */}
-              <div className="bg-gradient-to-r from-red-50 via-red-50/50 to-transparent rounded-3xl p-6 border-2 border-red-200 shadow-lg shadow-red-100">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
-                  <div className="flex items-center gap-4">
-                    <div className="p-4 bg-red-100 rounded-2xl text-red-600 shadow-lg shadow-red-200/50">
-                      <WarningIcon sx={{ fontSize: 32 }} />
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-bold text-red-900 mb-1">
-                        Cảnh báo tồn kho nghiêm trọng
-                      </h3>
-                      <p className="text-sm text-red-700">
-                        Các vật phẩm dưới mức an toàn cần nhập kho ngay lập tức
-                      </p>
-                    </div>
+                {filteredItems.length > 0 && (
+                  <div className="px-6 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                    <span>
+                      Hien thi{" "}
+                      <strong className="text-slate-700">
+                        {filteredItems.length}
+                      </strong>{" "}
+                      hang hoa
+                    </span>
+                    <span>
+                      Kho:{" "}
+                      <strong className="text-slate-700">
+                        {selectedWarehouse?.resourceId ||
+                          selectedWarehouse?.address ||
+                          `#${selectedWarehouseId}`}
+                      </strong>
+                    </span>
                   </div>
-                  <button className="px-6 py-3 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white text-sm font-bold rounded-2xl transition-all duration-300 shadow-lg shadow-red-500/30 hover:shadow-red-500/50 whitespace-nowrap">
-                    Tạo phiếu nhập khẩn cấp
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {criticalItems.map((item) => (
-                    <div
-                      key={item.id}
-                      className="group bg-white border-2 border-red-100 hover:border-red-300 p-5 rounded-2xl flex items-center justify-between transition-all duration-300 hover:shadow-lg"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 bg-red-50 group-hover:bg-red-100 rounded-xl flex items-center justify-center text-red-600 transition-colors">
-                          {item.icon}
-                        </div>
-                        <div>
-                          <p className="text-sm font-bold text-slate-900">
-                            {item.name}
-                          </p>
-                          <p className="text-xs text-red-600 font-semibold">
-                            Còn lại: {item.remaining}
-                          </p>
-                        </div>
-                      </div>
-                      <span className="text-xs bg-slate-100 group-hover:bg-red-600 group-hover:text-white px-3 py-1.5 rounded-xl font-semibold transition-all duration-300">
-                        Nhập ngay
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                )}
               </div>
+
+              {/* LOW STOCK ALERT */}
+              {lowStockItems.length > 0 && (
+                <div className="bg-gradient-to-r from-red-50 via-red-50/50 to-transparent rounded-3xl p-6 border-2 border-red-200 shadow-lg shadow-red-100/50 mb-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3.5 bg-red-100 rounded-2xl text-red-600">
+                        <WarningIcon sx={{ fontSize: 28 }} />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-red-900">
+                          Canh bao ton kho thap ({lowStockItems.length} mat
+                          hang)
+                        </h3>
+                        <p className="text-sm text-red-600">
+                          Cac hang hoa duoi 50 don vi can nhap kho gap
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setShowInventoryInModal(true)}
+                      className="px-5 py-2.5 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-red-500/20 whitespace-nowrap"
+                    >
+                      Nhap kho khan cap
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {lowStockItems.slice(0, 6).map((item) => {
+                      const typeConfig = getItemTypeConfig(item.itemId);
+                      return (
+                        <div
+                          key={item.itemId}
+                          className="bg-white border-2 border-red-100 hover:border-red-300 p-4 rounded-2xl flex items-center justify-between transition-all hover:shadow-md group"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`w-10 h-10 rounded-xl flex items-center justify-center ${typeConfig ? typeConfig.iconBg : "bg-slate-200"} text-white`}
+                            >
+                              <ItemTypeIcon
+                                itemType={getCatalogItem(item.itemId)?.itemType}
+                                size={16}
+                              />
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-slate-900">
+                                {item.itemName}
+                              </p>
+                              <p className="text-xs text-red-600 font-semibold">
+                                Con lai: {item.quantity} don vi
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => setShowInventoryInModal(true)}
+                            className="text-xs bg-slate-100 group-hover:bg-red-600 group-hover:text-white px-3 py-1.5 rounded-xl font-semibold transition-all"
+                          >
+                            Nhap ngay
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Footer */}
-              <div className="mt-8 border-t border-slate-200 pt-6 text-center">
-                <p className="text-xs text-slate-500">
-                  © 2024 ReliefOps System. Inventory Module v2.4.1 (Build 8902)
+              <div className="mt-6 border-t border-slate-200 pt-5 text-center">
+                <p className="text-xs text-slate-400">
+                  2026 ReliefOps System · Warehouse Module v2.0 · Du lieu thoi
+                  gian thuc tu API
                 </p>
               </div>
             </>
           )}
         </div>
       </div>
+
+      {/* MODAL: TAO KHO MOI */}
+      <Modal
+        open={showCreateWarehouseModal}
+        onClose={() => setShowCreateWarehouseModal(false)}
+        title="Tao kho moi"
+      >
+        <form onSubmit={handleCreateWarehouse} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={labelClass}>User ID (Manager) *</label>
+              <input
+                type="number"
+                required
+                value={createWarehouseForm.userId}
+                onChange={(e) =>
+                  setCreateWarehouseForm((f) => ({
+                    ...f,
+                    userId: e.target.value,
+                  }))
+                }
+                className={inputClass}
+                placeholder="Nhap user ID"
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Trang thai *</label>
+              <select
+                required
+                value={createWarehouseForm.status}
+                onChange={(e) =>
+                  setCreateWarehouseForm((f) => ({
+                    ...f,
+                    status: e.target.value,
+                  }))
+                }
+                className={inputClass}
+              >
+                <option value="ACTIVE">Hoat dong</option>
+                <option value="INACTIVE">Tam ngung</option>
+                <option value="LOCKED">Bi khoa</option>
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={labelClass}>Ma tai nguyen (Resource ID)</label>
+              <input
+                type="text"
+                value={createWarehouseForm.resourceId}
+                onChange={(e) =>
+                  setCreateWarehouseForm((f) => ({
+                    ...f,
+                    resourceId: e.target.value,
+                  }))
+                }
+                className={inputClass}
+                placeholder="VD: RES-001"
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Ma nguon cung (Supply ID)</label>
+              <input
+                type="text"
+                value={createWarehouseForm.supplyId}
+                onChange={(e) =>
+                  setCreateWarehouseForm((f) => ({
+                    ...f,
+                    supplyId: e.target.value,
+                  }))
+                }
+                className={inputClass}
+                placeholder="VD: SUP-001"
+              />
+            </div>
+          </div>
+          <div>
+            <label className={labelClass}>Dia chi *</label>
+            <input
+              type="text"
+              required
+              value={createWarehouseForm.address}
+              onChange={(e) =>
+                setCreateWarehouseForm((f) => ({
+                  ...f,
+                  address: e.target.value,
+                }))
+              }
+              className={inputClass}
+              placeholder="VD: 123 Duong Le Loi, TP.HCM"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={labelClass}>Vi do (Latitude)</label>
+              <input
+                type="number"
+                step="any"
+                value={createWarehouseForm.latitude}
+                onChange={(e) =>
+                  setCreateWarehouseForm((f) => ({
+                    ...f,
+                    latitude: e.target.value,
+                  }))
+                }
+                className={inputClass}
+                placeholder="VD: 10.12345678"
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Kinh do (Longitude)</label>
+              <input
+                type="number"
+                step="any"
+                value={createWarehouseForm.longitude}
+                onChange={(e) =>
+                  setCreateWarehouseForm((f) => ({
+                    ...f,
+                    longitude: e.target.value,
+                  }))
+                }
+                className={inputClass}
+                placeholder="VD: 106.12345678"
+              />
+            </div>
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setShowCreateWarehouseModal(false)}
+              className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold text-sm transition-colors"
+            >
+              Huy
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="flex-1 py-3 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 disabled:opacity-60 text-white rounded-xl font-semibold text-sm transition-all shadow-lg shadow-violet-500/20"
+            >
+              {submitting ? "Dang tao..." : "Tao kho"}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* MODAL: NHAP KHO */}
+      <Modal
+        open={showInventoryInModal}
+        onClose={() => setShowInventoryInModal(false)}
+        title="Nhap hang vao kho"
+      >
+        <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-700 font-medium flex items-center gap-2">
+          <WarehouseIcon sx={{ fontSize: 16 }} />
+          Kho:{" "}
+          <strong>
+            {selectedWarehouse?.resourceId ||
+              selectedWarehouse?.address ||
+              `#${selectedWarehouseId}`}
+          </strong>
+        </div>
+        <form onSubmit={handleInventoryIn} className="space-y-4">
+          <div>
+            <label className={labelClass}>Hang hoa *</label>
+            <select
+              required
+              value={inventoryInForm.itemId}
+              onChange={(e) =>
+                setInventoryInForm((f) => ({ ...f, itemId: e.target.value }))
+              }
+              className={inputClass}
+            >
+              <option value="">-- Chon hang hoa --</option>
+              {catalogItems.map((item) => (
+                <option key={item.id} value={item.id}>
+                  [{ITEM_TYPE_CONFIG[item.itemType]?.label || item.itemType}]{" "}
+                  {item.name}
+                  {item.capacity ? ` - ${item.capacity}` : ""}
+                </option>
+              ))}
+            </select>
+            {catalogItems.length === 0 && (
+              <p className="text-xs text-amber-600 mt-1">
+                Chua co danh muc hang hoa. Vui long lien he Admin.
+              </p>
+            )}
+          </div>
+          <div>
+            <label className={labelClass}>So luong nhap *</label>
+            <input
+              type="number"
+              required
+              min="1"
+              value={inventoryInForm.quantity}
+              onChange={(e) =>
+                setInventoryInForm((f) => ({ ...f, quantity: e.target.value }))
+              }
+              className={inputClass}
+              placeholder="Nhap so luong (> 0)"
+            />
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setShowInventoryInModal(false)}
+              className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold text-sm transition-colors"
+            >
+              Huy
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="flex-1 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:opacity-60 text-white rounded-xl font-semibold text-sm transition-all shadow-lg shadow-emerald-500/20"
+            >
+              {submitting ? "Dang nhap..." : "Xac nhan nhap kho"}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* MODAL: XUAT KHO */}
+      <Modal
+        open={showInventoryOutModal}
+        onClose={() => setShowInventoryOutModal(false)}
+        title="Xuat hang khoi kho"
+      >
+        <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-700 font-medium flex items-center gap-2">
+          <WarehouseIcon sx={{ fontSize: 16 }} />
+          Kho:{" "}
+          <strong>
+            {selectedWarehouse?.resourceId ||
+              selectedWarehouse?.address ||
+              `#${selectedWarehouseId}`}
+          </strong>
+        </div>
+        <form onSubmit={handleInventoryOut} className="space-y-4">
+          <div>
+            <label className={labelClass}>Hang hoa *</label>
+            <select
+              required
+              value={inventoryOutForm.itemId}
+              onChange={(e) =>
+                setInventoryOutForm((f) => ({ ...f, itemId: e.target.value }))
+              }
+              className={inputClass}
+            >
+              <option value="">-- Chon hang hoa --</option>
+              {inventoryData?.items?.map((item) => {
+                const typeConfig = getItemTypeConfig(item.itemId);
+                return (
+                  <option key={item.itemId} value={item.itemId}>
+                    [{typeConfig?.label || "-"}] {item.itemName} - Ton:{" "}
+                    {item.quantity}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+          <div>
+            <label className={labelClass}>So luong xuat *</label>
+            <input
+              type="number"
+              required
+              min="1"
+              value={inventoryOutForm.quantity}
+              onChange={(e) =>
+                setInventoryOutForm((f) => ({ ...f, quantity: e.target.value }))
+              }
+              className={inputClass}
+              placeholder="Nhap so luong can xuat (> 0)"
+            />
+          </div>
+          <p className="text-xs text-slate-500 bg-slate-50 rounded-xl p-3 border border-slate-200">
+            He thong se kiem tra ton kho. Neu so luong yeu cau vuot qua ton kho,
+            thao tac se bi tu choi.
+          </p>
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setShowInventoryOutModal(false)}
+              className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold text-sm transition-colors"
+            >
+              Huy
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="flex-1 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 disabled:opacity-60 text-white rounded-xl font-semibold text-sm transition-all shadow-lg shadow-amber-500/20"
+            >
+              {submitting ? "Dang xuat..." : "Xac nhan xuat kho"}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* MODAL: PHAN PHOI CUU TRO */}
+      <Modal
+        open={showReliefDistModal}
+        onClose={() => setShowReliefDistModal(false)}
+        title="Phan phoi hang cuu tro"
+      >
+        <form onSubmit={handleReliefDistribution} className="space-y-4">
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-700 font-medium">
+            Ghi nhan viec phan phoi hang hoa truc tiep den ho dan theo nhiem vu
+            cuu ho. Thao tac nay se tu dong giam ton kho tuong ung.
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={labelClass}>ID Nhiem vu (Mission ID) *</label>
+              <input
+                type="number"
+                required
+                min="1"
+                value={reliefDistForm.missionId}
+                onChange={(e) =>
+                  setReliefDistForm((f) => ({
+                    ...f,
+                    missionId: e.target.value,
+                  }))
+                }
+                className={inputClass}
+                placeholder="Nhap mission ID"
+              />
+            </div>
+            <div>
+              <label className={labelClass}>ID Ton kho (Inventory ID) *</label>
+              <input
+                type="number"
+                required
+                min="1"
+                value={reliefDistForm.inventoryId}
+                onChange={(e) =>
+                  setReliefDistForm((f) => ({
+                    ...f,
+                    inventoryId: e.target.value,
+                  }))
+                }
+                className={inputClass}
+                placeholder="Nhap inventory ID"
+              />
+              {inventoryData?.items && inventoryData.items.length > 0 && (
+                <p className="text-xs text-slate-400 mt-1">
+                  Cac item trong kho:{" "}
+                  {inventoryData.items
+                    .map(
+                      (i) => `${i.itemName}(id:${i.inventoryId || i.itemId})`,
+                    )
+                    .join(", ")}
+                </p>
+              )}
+            </div>
+          </div>
+          <div>
+            <label className={labelClass}>So luong phan phoi *</label>
+            <input
+              type="number"
+              required
+              min="0"
+              value={reliefDistForm.quantity}
+              onChange={(e) =>
+                setReliefDistForm((f) => ({ ...f, quantity: e.target.value }))
+              }
+              className={inputClass}
+              placeholder="So luong (>= 0)"
+            />
+          </div>
+          <div>
+            <label className={labelClass}>CCCD / Ma dinh danh ho dan *</label>
+            <input
+              type="text"
+              required
+              value={reliefDistForm.householdIdentifier}
+              onChange={(e) =>
+                setReliefDistForm((f) => ({
+                  ...f,
+                  householdIdentifier: e.target.value,
+                }))
+              }
+              className={inputClass}
+              placeholder="VD: 079201012345"
+              maxLength={20}
+            />
+          </div>
+          <div className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+            <input
+              type="checkbox"
+              id="isConfirmed"
+              checked={reliefDistForm.isConfirmed}
+              onChange={(e) =>
+                setReliefDistForm((f) => ({
+                  ...f,
+                  isConfirmed: e.target.checked,
+                }))
+              }
+              className="w-4 h-4 rounded accent-blue-600"
+            />
+            <label
+              htmlFor="isConfirmed"
+              className="text-sm text-slate-700 font-medium cursor-pointer"
+            >
+              Ho dan da xac nhan nhan hang
+            </label>
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setShowReliefDistModal(false)}
+              className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold text-sm transition-colors"
+            >
+              Huy
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="flex-1 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-60 text-white rounded-xl font-semibold text-sm transition-all shadow-lg shadow-blue-500/20"
+            >
+              {submitting ? "Dang ghi nhan..." : "Xac nhan phan phoi"}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

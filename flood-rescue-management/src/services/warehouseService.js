@@ -124,6 +124,21 @@ export const deleteWarehouse = async (id) => {
   }
 };
 
+/**
+ * Ghi nhận phân phối hàng cứu trợ
+ * POST /api/v1/relief-distributions
+ * @param {Object} data - { missionId, inventoryId, quantity, householdIdentifier, isConfirmed }
+ */
+export const createReliefDistribution = async (data) => {
+  try {
+    const response = await api.post("/relief-distributions", data);
+    return response.data;
+  } catch (error) {
+    console.error("Lỗi khi ghi nhận phân phối cứu trợ:", error);
+    throw error;
+  }
+};
+
 export default {
   getAllWarehouses,
   createWarehouse,
@@ -133,4 +148,5 @@ export default {
   inventoryOut,
   updateWarehouse,
   deleteWarehouse,
+  createReliefDistribution,
 };
