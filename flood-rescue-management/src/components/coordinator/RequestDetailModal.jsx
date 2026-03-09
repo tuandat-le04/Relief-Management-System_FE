@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React, { useState, useEffect } from "react";
 
 const PRIORITY_CONFIG = {
   CRITICAL: {
@@ -113,15 +113,128 @@ const formatDateTime = (isoString) => {
 };
 
 const RequestDetailModal = ({ isOpen, onClose, request }) => {
+  const [lightboxIdx, setLightboxIdx] = useState(null);
+
+  // Reset lightbox khi đóng/mở modal
+  useEffect(() => {
+    if (!isOpen) setLightboxIdx(null);
+  }, [isOpen]);
+
+  // Đóng lightbox khi nhấn Escape / điều hướng bằng mũi tên
+  useEffect(() => {
+    if (lightboxIdx === null) return;
+    const handler = (e) => {
+      if (e.key === "Escape") setLightboxIdx(null);
+      if (e.key === "ArrowRight") setLightboxIdx((i) => (i + 1) % medias.length);
+      if (e.key === "ArrowLeft") setLightboxIdx((i) => (i - 1 + medias.length) % medias.length);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [lightboxIdx]);
+
   if (!isOpen || !request) return null;
 
-  const priority =
-    PRIORITY_CONFIG[request.priority] || PRIORITY_CONFIG["NORMAL"];
+  // Theo F4: media đã nhúng sẵn trong response từ GET /rescue-requests
+  // Mỗi phần tử là { id, mediaUrl, mediaType, fileSize, mimeType, createdAt }
+  const medias = request.medias ?? [];
+
+  const priority = PRIORITY_CONFIG[request.priority] || PRIORITY_CONFIG["NORMAL"];
   const status = STATUS_CONFIG[request.status] || STATUS_CONFIG["CREATED"];
   const reqType = TYPE_CONFIG[request.requestType] || TYPE_CONFIG["OTHER"];
 
+  // Theo F3: phân loại bằng mediaType (IMAGE / VIDEO), không check extension
+  const isVideo = (media) => media.mediaType === "VIDEO";
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      {/* ── Lightbox ── */}
+      {lightboxIdx !== null && medias.length > 0 && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-sm"
+          onClick={() => setLightboxIdx(null)}
+        >
+          {/* Điều hướng trái */}
+          {medias.length > 1 && (
+            <button
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white bg-black/30 hover:bg-black/60 rounded-full p-3 transition-all z-10"
+              onClick={(e) => { e.stopPropagation(); setLightboxIdx((lightboxIdx - 1 + medias.length) % medias.length); }}
+            >
+              <span className="material-symbols-outlined text-2xl">chevron_left</span>
+            </button>
+          )}
+
+          <div
+            className="relative flex flex-col items-center max-w-5xl max-h-[90vh] px-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Theo F3: dùng mediaType để phân biệt, dùng mimeType cho <source> */}
+            {isVideo(medias[lightboxIdx]) ? (
+              <video
+                controls
+                autoPlay
+                className="max-h-[80vh] max-w-full rounded-xl shadow-2xl"
+              >
+                <source src={medias[lightboxIdx].mediaUrl} type={medias[lightboxIdx].mimeType} />
+                Trình duyệt không hỗ trợ video.
+              </video>
+            ) : (
+              <img
+                src={medias[lightboxIdx].mediaUrl}
+                alt={`Ảnh ${lightboxIdx + 1}`}
+                className="max-h-[80vh] max-w-full rounded-xl shadow-2xl object-contain"
+              />
+            )}
+            <p className="text-white/60 text-sm mt-3">
+              {lightboxIdx + 1} / {medias.length}
+              {medias.length > 1 && (
+                <span className="ml-2 text-white/40">← → để chuyển, Esc để đóng</span>
+              )}
+            </p>
+          </div>
+
+          {/* Điều hướng phải */}
+          {medias.length > 1 && (
+            <button
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white bg-black/30 hover:bg-black/60 rounded-full p-3 transition-all z-10"
+              onClick={(e) => { e.stopPropagation(); setLightboxIdx((lightboxIdx + 1) % medias.length); }}
+            >
+              <span className="material-symbols-outlined text-2xl">chevron_right</span>
+            </button>
+          )}
+
+          {/* Nút đóng */}
+          <button
+            className="absolute top-4 right-4 text-white/70 hover:text-white bg-black/30 hover:bg-black/60 rounded-full p-2 transition-all z-10"
+            onClick={() => setLightboxIdx(null)}
+          >
+            <span className="material-symbols-outlined text-2xl">close</span>
+          </button>
+
+          {/* Thanh thumbnail nhỏ phía dưới */}
+          {medias.length > 1 && (
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4">
+              {medias.map((media, idx) => (
+                <button
+                  key={media.id ?? idx}
+                  onClick={(e) => { e.stopPropagation(); setLightboxIdx(idx); }}
+                  className={`w-12 h-10 rounded-lg overflow-hidden border-2 transition-all flex-shrink-0 ${
+                    idx === lightboxIdx ? "border-white scale-110" : "border-white/30 opacity-60 hover:opacity-100"
+                  }`}
+                >
+                  {isVideo(media) ? (
+                    <div className="w-full h-full bg-slate-700 flex items-center justify-center">
+                      <span className="material-symbols-outlined text-white text-sm">videocam</span>
+                    </div>
+                  ) : (
+                    <img src={media.mediaUrl} alt="" className="w-full h-full object-cover" />
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="bg-gradient-to-r from-slate-800 to-slate-700 px-6 py-4 flex-shrink-0">
@@ -234,50 +347,79 @@ const RequestDetailModal = ({ isOpen, onClose, request }) => {
             </div>
           </div>
 
-          {/* Media đính kèm */}
-          {request.requestMedia && (
-            <div className="mb-4">
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
+          {/* ── Hình ảnh / Video đính kèm ── */}
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">
                 Hình ảnh / Video đính kèm
               </h3>
-              <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-100">
-                {/\.(mp4|webm|ogg)$/i.test(request.requestMedia) ? (
-                  <video
-                    src={request.requestMedia}
-                    controls
-                    className="w-full max-h-52 object-cover"
-                  />
-                ) : (
-                  <img
-                    src={request.requestMedia}
-                    alt="Ảnh đính kèm yêu cầu"
-                    className="w-full max-h-52 object-cover"
-                    onError={(e) => {
-                      e.target.style.display = "none";
-                      e.target.nextSibling.style.display = "flex";
-                    }}
-                  />
-                )}
-                <div
-                  style={{ display: "none" }}
-                  className="flex flex-col items-center justify-center py-8 text-slate-400 gap-2"
-                >
-                  <span className="material-symbols-outlined text-4xl">
-                    broken_image
-                  </span>
-                  <p className="text-sm">Không thể tải ảnh</p>
-                  <a
-                    href={request.requestMedia}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-500 text-xs hover:underline"
-                  >
-                    Mở link gốc
-                  </a>
-                </div>
-              </div>
+              {medias.length > 0 && (
+                <span className="text-[11px] font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                  {medias.length} tệp
+                </span>
+              )}
             </div>
-          )}
+
+            {/* Có media → hiển thị grid */}
+            {medias.length > 0 && (
+              <div className={`grid gap-2 ${medias.length === 1 ? "grid-cols-1" : medias.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
+                {medias.map((media, idx) => (
+                  <button
+                    key={media.id ?? idx}
+                    onClick={() => setLightboxIdx(idx)}
+                    className="relative group overflow-hidden rounded-xl border border-slate-200 hover:border-blue-400 hover:shadow-md transition-all bg-slate-100"
+                    style={{ aspectRatio: medias.length === 1 ? "16/9" : "1" }}
+                    title="Phóng to"
+                  >
+                    {/* Theo F3: dùng mediaType để phân loại, không check extension */}
+                    {isVideo(media) ? (
+                      <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800 gap-2">
+                        <span className="material-symbols-outlined text-white text-3xl">play_circle</span>
+                        <span className="text-white/70 text-[10px]">
+                          {media.mimeType || "Video"}
+                        </span>
+                      </div>
+                    ) : (
+                      <img
+                        src={media.mediaUrl}
+                        alt={`Ảnh ${idx + 1}`}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        onError={(e) => {
+                          e.target.style.display = "none";
+                          e.target.nextSibling?.classList.remove("hidden");
+                        }}
+                      />
+                    )}
+                    {/* Fallback lỗi ảnh */}
+                    <div className="hidden w-full h-full absolute inset-0 flex flex-col items-center justify-center bg-slate-100 gap-1">
+                      <span className="material-symbols-outlined text-slate-400 text-2xl">broken_image</span>
+                      <span className="text-[10px] text-slate-400">Lỗi tải ảnh</span>
+                    </div>
+                    {/* Overlay zoom khi hover */}
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                      <span className="material-symbols-outlined text-white text-2xl opacity-0 group-hover:opacity-100 transition-opacity drop-shadow">
+                        zoom_in
+                      </span>
+                    </div>
+                    {/* Badge số thứ tự */}
+                    <span className="absolute top-1.5 left-1.5 bg-black/50 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+                      {idx + 1}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Không có media */}
+            {medias.length === 0 && (
+              <div className="flex flex-col items-center justify-center gap-2 py-7 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+                <span className="material-symbols-outlined text-slate-300 text-4xl">
+                  photo_library
+                </span>
+                <p className="text-sm text-slate-400 font-medium">Chưa có hình ảnh đính kèm</p>
+              </div>
+            )}
+          </div>
 
           {/* Thời gian */}
           <div className="mb-2">

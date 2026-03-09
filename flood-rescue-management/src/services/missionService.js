@@ -1,13 +1,121 @@
 import api from "./api";
 
 const missionService = {
+  // ── GET /api/v1/missions ─────────────────────────────────────────────────
+  // Lấy toàn bộ nhiệm vụ (dành cho Coordinator/Admin)
+  getAllMissions: async () => {
+    try {
+      const response = await api.get("/missions");
+      if (response.data?.success) {
+        const list = Array.isArray(response.data?.data)
+          ? response.data.data
+          : [];
+        return { success: true, data: list };
+      }
+      return {
+        success: false,
+        error: response.data?.message || "Không thể tải danh sách nhiệm vụ",
+      };
+    } catch (error) {
+      console.error("Error fetching all missions:", error);
+      return {
+        success: false,
+        error:
+          error.response?.data?.message ||
+          error.message ||
+          "Không thể tải danh sách nhiệm vụ",
+      };
+    }
+  },
+
+  // ── GET /api/v1/missions/{id} ────────────────────────────────────────────
+  getMissionById: async (id) => {
+    try {
+      const response = await api.get(`/missions/${id}`);
+      if (response.data?.success && response.data?.data) {
+        return { success: true, data: response.data.data };
+      }
+      return { success: false, error: "Không tìm thấy nhiệm vụ" };
+    } catch (error) {
+      console.error(`Error fetching mission ${id}:`, error);
+      return {
+        success: false,
+        error:
+          error.response?.data?.message || "Không thể tải thông tin nhiệm vụ",
+      };
+    }
+  },
+
+  // ── POST /api/v1/missions/request/{requestId} ────────────────────────────
+  // Tạo nhiệm vụ thủ công từ requestId (nếu approve chưa tự tạo)
+  createMissionFromRequest: async (requestId) => {
+    try {
+      const response = await api.post(`/missions/request/${requestId}`);
+      if (response.data?.success) {
+        return {
+          success: true,
+          message: response.data.message || "Tạo nhiệm vụ thành công",
+          data: response.data.data,
+        };
+      }
+      return {
+        success: false,
+        error: response.data?.message || "Tạo nhiệm vụ thất bại",
+      };
+    } catch (error) {
+      console.error("Error creating mission from request:", error);
+      return {
+        success: false,
+        error: error.response?.data?.message || "Không thể tạo nhiệm vụ",
+      };
+    }
+  },
+
+  // ── PATCH /api/v1/missions/{id}/status ───────────────────────────────────
+  // status: PENDING | ASSIGNED | IN_PROGRESS | ARRIVED | COMPLETED | CANCELLED
+  updateMissionStatus: async (
+    id,
+    { status, peopleRescued, summary, obstacles },
+  ) => {
+    try {
+      const body = { status };
+      if (peopleRescued !== undefined) body.peopleRescued = peopleRescued;
+      if (summary !== undefined) body.summary = summary;
+      if (obstacles !== undefined) body.obstacles = obstacles;
+
+      const response = await api.patch(`/missions/${id}/status`, body);
+      if (response.data?.success) {
+        return {
+          success: true,
+          message:
+            response.data.message || "Cập nhật trạng thái nhiệm vụ thành công",
+          data: response.data.data,
+        };
+      }
+      return {
+        success: false,
+        error: response.data?.message || "Cập nhật trạng thái thất bại",
+      };
+    } catch (error) {
+      console.error("Error updating mission status:", error);
+      return {
+        success: false,
+        error:
+          error.response?.data?.message ||
+          "Không thể cập nhật trạng thái nhiệm vụ",
+      };
+    }
+  },
+
   // Lấy danh sách nhiệm vụ được giao cho tôi (Rescue Team đang đăng nhập)
   // GET /api/v1/missions/assigned-to-me
   getAssignedToMe: async () => {
     try {
       const response = await api.get("/missions/assigned-to-me");
       if (response.data?.success) {
-        const list = Array.isArray(response.data?.data) ? response.data.data : [];
+        const list = Array.isArray(response.data?.data)
+          ? response.data.data
+          : [];
         return { success: true, data: list };
       }
       return {
@@ -41,8 +149,7 @@ const missionService = {
       return {
         success: false,
         error:
-          error.response?.data?.message ||
-          "Không thể tải thông tin nhiệm vụ",
+          error.response?.data?.message || "Không thể tải thông tin nhiệm vụ",
       };
     }
   },
@@ -52,7 +159,7 @@ const missionService = {
   checkVehicleAvailability: async (vehicleId) => {
     try {
       const response = await api.get(
-        `/vehicles/check-availability?vehicleId=${vehicleId}`
+        `/vehicles/check-availability?vehicleId=${vehicleId}`,
       );
       if (response.data?.success) {
         return { success: true, available: response.data.data === true };
@@ -76,8 +183,7 @@ const missionService = {
       if (response.data?.success) {
         return {
           success: true,
-          message:
-            response.data.message || "Phân công đội cứu hộ thành công",
+          message: response.data.message || "Phân công đội cứu hộ thành công",
           data: response.data.data,
         };
       }
@@ -90,8 +196,7 @@ const missionService = {
       return {
         success: false,
         error:
-          error.response?.data?.message ||
-          "Không thể phân công đội cứu hộ",
+          error.response?.data?.message || "Không thể phân công đội cứu hộ",
       };
     }
   },
@@ -100,15 +205,13 @@ const missionService = {
   // POST /api/v1/missions/{missionId}/assign-vehicle
   assignVehicle: async (missionId, vehicleId) => {
     try {
-      const response = await api.post(
-        `/missions/${missionId}/assign-vehicle`,
-        { vehicleId }
-      );
+      const response = await api.post(`/missions/${missionId}/assign-vehicle`, {
+        vehicleId,
+      });
       if (response.data?.success) {
         return {
           success: true,
-          message:
-            response.data.message || "Gán phương tiện thành công",
+          message: response.data.message || "Gán phương tiện thành công",
           data: response.data.data,
         };
       }
@@ -120,8 +223,7 @@ const missionService = {
       console.error("Error assigning vehicle:", error);
       return {
         success: false,
-        error:
-          error.response?.data?.message || "Không thể gán phương tiện",
+        error: error.response?.data?.message || "Không thể gán phương tiện",
       };
     }
   },

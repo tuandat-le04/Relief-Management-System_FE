@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 
 export const getPriorityColor = (priority) => {
   if (priority === "CRITICAL") return "border-red-600";
@@ -61,30 +61,116 @@ const RequestCard = ({
   onFlyTo,
   onAssign,
 }) => {
+  const [lightboxUrl, setLightboxUrl] = useState(null);
+  // Theo F4: media đã nhúng sẵn trong response, không cần fetch riêng
+  // request.medias = mảng object đầy đủ, request.mediaList = mảng URL
+  const medias = request.medias ?? [];
+  const hasMedia = medias.length > 0;
+  const previewList = medias.slice(0, 3);
+  const extraCount = medias.length - 3;
+
   return (
     <div
       className={`relative group bg-white rounded-xl border-l-4 ${getPriorityColor(request.priority)} shadow-sm hover:shadow-md transition-all overflow-hidden`}
     >
+      {/* Lightbox inline */}
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+          onClick={() => setLightboxUrl(null)}
+        >
+          <button
+            className="absolute top-5 right-5 text-white/80 hover:text-white"
+            onClick={() => setLightboxUrl(null)}
+          >
+            <span className="material-symbols-outlined text-3xl">close</span>
+          </button>
+          <img
+            src={lightboxUrl}
+            alt="Ảnh phóng to"
+            className="max-w-full max-h-[85vh] rounded-xl shadow-2xl object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
+
       <div className="p-4">
         <div className="flex justify-between items-start mb-2">
           <div className="flex items-center gap-2">
             {getStatusBadge(request.status)}
-            {request.status === "CREATED" && getPriorityBadge(request.priority)}
+            {request.status === "PENDING" && getPriorityBadge(request.priority)}
           </div>
-          <span className="text-xs font-medium text-slate-400">
-            {request.time}
-          </span>
+          <div className="flex items-center gap-2">
+            {hasMedia && (
+              <span className="flex items-center gap-0.5 text-[10px] font-semibold text-slate-400">
+                <span className="material-symbols-outlined text-xs">photo_library</span>
+                {medias.length}
+              </span>
+            )}
+            <span className="text-xs font-medium text-slate-400">
+              {request.time}
+            </span>
+          </div>
         </div>
         <h3 className="text-base font-bold text-slate-900 mb-1">
           {request.name} - {request.type}
         </h3>
-        <p className="text-sm text-slate-500 flex items-center gap-1 mb-4">
+        <p className="text-sm text-slate-500 flex items-center gap-1 mb-3">
           <span className="material-symbols-outlined text-sm">location_on</span>
           {request.location}
         </p>
 
-        {/* CREATED: Xem chi tiết → Phân loại → Tiếp nhận / Từ chối */}
-        {request.status === "CREATED" && (
+        {/* ── Thumbnail strip ── */}
+        {hasMedia && (
+          <div className="mb-3">
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+              {previewList.map((media, idx) => (
+                <button
+                  key={media.id ?? idx}
+                  onClick={() => setLightboxUrl(media.mediaUrl)}
+                  className="relative flex-shrink-0 w-16 h-14 rounded-lg overflow-hidden border border-slate-200 hover:border-blue-400 hover:shadow-md transition-all group/thumb"
+                  title="Phóng to"
+                >
+                  {media.mediaType === "VIDEO" ? (
+                    <div className="w-full h-full bg-slate-800 flex flex-col items-center justify-center gap-0.5">
+                      <span className="material-symbols-outlined text-white text-base">play_circle</span>
+                      <span className="text-white/60 text-[9px]">Video</span>
+                    </div>
+                  ) : (
+                    <img
+                      src={media.mediaUrl}
+                      alt={`Ảnh ${idx + 1}`}
+                      className="w-full h-full object-cover group-hover/thumb:scale-105 transition-transform"
+                      onError={(e) => {
+                        e.target.parentElement.classList.add("bg-slate-100");
+                        e.target.style.display = "none";
+                      }}
+                    />
+                  )}
+                  {/* overlay icon khi hover */}
+                  <div className="absolute inset-0 bg-black/0 group-hover/thumb:bg-black/25 transition-colors flex items-center justify-center">
+                    <span className="material-symbols-outlined text-white text-base opacity-0 group-hover/thumb:opacity-100 transition-opacity">
+                      zoom_in
+                    </span>
+                  </div>
+                </button>
+              ))}
+              {extraCount > 0 && (
+                <button
+                  onClick={() => onDetail(request)}
+                  className="flex-shrink-0 w-16 h-14 rounded-lg border border-slate-200 bg-slate-100 hover:bg-slate-200 transition-colors flex flex-col items-center justify-center gap-0.5"
+                  title="Xem tất cả ảnh"
+                >
+                  <span className="material-symbols-outlined text-slate-500 text-base">more_horiz</span>
+                  <span className="text-[10px] font-bold text-slate-500">+{extraCount}</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* PENDING: Xem chi tiết → Phân loại → Tiếp nhận / Từ chối */}
+        {request.status === "PENDING" && (
           <div className="flex flex-col gap-2">
             <button
               onClick={() => onDetail(request)}
@@ -144,24 +230,24 @@ const RequestCard = ({
               Phân công đội &amp; phương tiện
             </button>
             <div className="flex items-center gap-2">
-            <button
-              onClick={() => onApprove(request.id, "complete")}
-              className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white py-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-sm"
-            >
-              <span className="material-symbols-outlined text-base">
-                task_alt
-              </span>
-              Đánh dấu hoàn thành
-            </button>
-            <button
-              onClick={() => onFlyTo(request)}
-              className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-blue-100 hover:text-blue-600 transition-colors"
-              title="Xem trên bản đồ"
-            >
-              <span className="material-symbols-outlined text-sm">
-                my_location
-              </span>
-            </button>
+              <button
+                onClick={() => onApprove(request.id, "complete")}
+                className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white py-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-sm"
+              >
+                <span className="material-symbols-outlined text-base">
+                  task_alt
+                </span>
+                Đánh dấu hoàn thành
+              </button>
+              <button
+                onClick={() => onFlyTo(request)}
+                className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-blue-100 hover:text-blue-600 transition-colors"
+                title="Xem trên bản đồ"
+              >
+                <span className="material-symbols-outlined text-sm">
+                  my_location
+                </span>
+              </button>
             </div>
           </div>
         )}
