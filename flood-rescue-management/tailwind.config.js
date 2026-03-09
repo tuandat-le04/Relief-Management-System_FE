@@ -22,7 +22,7 @@ module.exports = {
         "text-secondary": "#94a3b8",
       },
       fontFamily: {
-        display: ["Inter", "sans-serif"],
+        display: ["Inter", "Manrope", "sans-serif"],
       },
       animation: {
         'radar': 'radar 2s infinite ease-out',

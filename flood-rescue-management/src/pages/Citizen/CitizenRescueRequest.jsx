@@ -1,11 +1,33 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import authService from "../../services/authService";
 import api from "../../services/api";
 import CitizenMapGoong from "../../components/citizen/CitizenMapGoong";
 
-export default function CitizenRescueRequest() {
+const MAX_MEDIA_FILES = 5;
+const MAX_MEDIA_SIZE_BYTES = 20 * 1024 * 1024; // 20MB
+
+const formatBytes = (bytes) => {
+  const size = Number(bytes);
+  if (!Number.isFinite(size) || size <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  const idx = Math.min(units.length - 1, Math.floor(Math.log(size) / Math.log(1024)));
+  const value = size / 1024 ** idx;
+  return `${value.toFixed(value >= 10 || idx === 0 ? 0 : 1)} ${units[idx]}`;
+};
+
+const isAllowedMediaType = (mime) => {
+  if (!mime) return false;
+  return mime.startsWith("image/") || mime.startsWith("video/");
+};
+
+export default function CitizenRescueRequest({ requestId: requestIdProp } = {}) {
   const navigate = useNavigate();
+  const fileInputRef = useRef(null);
+  const [mediaItems, setMediaItems] = useState([]);
+  const [mediaError, setMediaError] = useState("");
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+  const [uploadedMedia, setUploadedMedia] = useState([]);
   const [formData, setFormData] = useState({
     fullName: "",
     phone: "",
@@ -18,6 +40,28 @@ export default function CitizenRescueRequest() {
   const [isLocating, setIsLocating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isMapOpen, setIsMapOpen] = useState(false);
+
+  const resolvedRequestIdForUpload = useMemo(() => {
+    if (requestIdProp != null) {
+      const n = Number(requestIdProp);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    }
+    const stored = parseInt(localStorage.getItem("lastRescueRequestId") || "", 10);
+    return Number.isFinite(stored) && stored > 0 ? stored : null;
+  }, [requestIdProp]);
+
+  useEffect(() => {
+    return () => {
+      mediaItems.forEach((it) => {
+        try {
+          URL.revokeObjectURL(it.previewUrl);
+        } catch {
+          // ignore
+        }
+      });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const currentUser = authService.getCurrentUser();
   const displayName =
@@ -35,6 +79,116 @@ export default function CitizenRescueRequest() {
   const handleLogout = () => {
     authService.logout();
     navigate("/login");
+  };
+
+  const addSelectedMediaFiles = (fileList) => {
+    setMediaError("");
+    const incoming = Array.from(fileList || []);
+    if (incoming.length === 0) return;
+
+    setMediaItems((prev) => {
+      const next = [...prev];
+      const errors = [];
+
+      for (const file of incoming) {
+        if (next.length >= MAX_MEDIA_FILES) {
+          errors.push(`Chỉ được chọn tối đa ${MAX_MEDIA_FILES} file.`);
+          break;
+        }
+        if (!isAllowedMediaType(file.type)) {
+          errors.push(`File "${file.name}" không đúng định dạng (chỉ cho phép ảnh/video).`);
+          continue;
+        }
+        if (file.size > MAX_MEDIA_SIZE_BYTES) {
+          errors.push(`File "${file.name}" vượt quá 20MB (${formatBytes(file.size)}).`);
+          continue;
+        }
+
+        const previewUrl = URL.createObjectURL(file);
+        const id =
+          typeof crypto !== "undefined" && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        next.push({
+          id,
+          file,
+          previewUrl,
+          kind: file.type.startsWith("video/") ? "video" : "image",
+        });
+      }
+
+      if (errors.length > 0) {
+        setMediaError(errors[0]);
+        window.alert(errors.join("\n"));
+      }
+
+      return next;
+    });
+  };
+
+  const handlePickMediaClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleMediaInputChange = (e) => {
+    addSelectedMediaFiles(e.target.files);
+    setFormData((prev) => ({ ...prev, images: e.target.files }));
+    e.target.value = "";
+  };
+
+  const handleRemoveMedia = (id) => {
+    setMediaItems((prev) => {
+      const target = prev.find((x) => x.id === id);
+      if (target) {
+        try {
+          URL.revokeObjectURL(target.previewUrl);
+        } catch {
+          // ignore
+        }
+      }
+      return prev.filter((x) => x.id !== id);
+    });
+  };
+
+  const uploadMediaFiles = async (requestId, items) => {
+    if (!requestId) throw new Error("Thiếu requestId để upload media");
+    if (!items || items.length === 0) return { success: 0, failed: 0 };
+
+    setIsUploadingMedia(true);
+    try {
+      const results = await Promise.allSettled(
+        items.map(async (it) => {
+          const formDataUpload = new FormData();
+          formDataUpload.append("file", it.file);
+
+          const res = await api.post(`/rescue-requests/${requestId}/media`, formDataUpload, {
+            headers: { "Content-Type": "multipart/form-data" },
+          });
+          return res?.data;
+        }),
+      );
+
+      let successCount = 0;
+      let failedCount = 0;
+      const uploaded = [];
+
+      for (const r of results) {
+        if (r.status === "fulfilled" && r.value?.success) {
+          successCount += 1;
+          if (r.value?.data) uploaded.push(r.value.data);
+        } else {
+          failedCount += 1;
+        }
+      }
+
+      if (uploaded.length > 0) {
+        setUploadedMedia((prev) => [...uploaded, ...prev]);
+      }
+
+      return { success: successCount, failed: failedCount };
+    } finally {
+      setIsUploadingMedia(false);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -61,8 +215,19 @@ export default function CitizenRescueRequest() {
 
       try {
         const created = response?.data?.data;
-        if (created?.id != null) {
-          localStorage.setItem("lastRescueRequestId", String(created.id));
+        const createdId = created?.id != null ? Number(created.id) : null;
+        if (created?.id != null) localStorage.setItem("lastRescueRequestId", String(created.id));
+
+        // Upload media (if any) after request is created
+        if (mediaItems.length > 0 && createdId) {
+          const { success, failed } = await uploadMediaFiles(createdId, mediaItems);
+          if (failed === 0) {
+            window.alert(`Upload thành công ${success}/${mediaItems.length} file.`);
+          } else {
+            window.alert(
+              `Upload xong: ${success}/${mediaItems.length} file thành công, ${failed} file thất bại.`,
+            );
+          }
         }
       } catch (e) {
         console.warn("Không lưu được lastRescueRequestId:", e);
@@ -367,7 +532,23 @@ export default function CitizenRescueRequest() {
                 <label className="text-[#131416] dark:text-gray-200 text-lg font-bold">
                   Ảnh hoặc Video (nếu có)
                 </label>
-                <div className="border-2 border-dashed border-[#dee0e3] dark:border-gray-700 rounded-xl p-8 flex flex-col items-center justify-center gap-3 bg-gray-50/30 dark:bg-gray-800/30 hover:bg-gray-100/50 transition-colors cursor-pointer group">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*,video/*"
+                  multiple
+                  className="hidden"
+                  onChange={handleMediaInputChange}
+                />
+                <div
+                  className="border-2 border-dashed border-[#dee0e3] dark:border-gray-700 rounded-xl p-8 flex flex-col items-center justify-center gap-3 bg-gray-50/30 dark:bg-gray-800/30 hover:bg-gray-100/50 transition-colors cursor-pointer group"
+                  role="button"
+                  tabIndex={0}
+                  onClick={handlePickMediaClick}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") handlePickMediaClick();
+                  }}
+                >
                   <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
                     <span className="material-symbols-outlined text-primary text-3xl font-light">
                       photo_camera
@@ -378,15 +559,72 @@ export default function CitizenRescueRequest() {
                     <p className="text-[#6b7680] text-sm">
                       Hệ thống sẽ tự động giảm dung lượng để gửi nhanh hơn
                     </p>
+                    <p className="text-[#6b7680] text-xs mt-2 font-medium">
+                      Đã chọn: {mediaItems.length}/{MAX_MEDIA_FILES} • Tối đa 20MB/file
+                    </p>
                   </div>
-                  <input
-                    type="file"
-                    accept="image/*,video/*"
-                    multiple
-                    className="hidden"
-                    onChange={(e) => setFormData((prev) => ({ ...prev, images: e.target.files }))}
-                  />
                 </div>
+
+                {mediaError && (
+                  <p className="mt-4 text-sm font-semibold text-red-600">{mediaError}</p>
+                )}
+
+                {mediaItems.length > 0 && (
+                  <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                    {mediaItems.map((it) => (
+                      <div
+                        key={it.id}
+                        className="bg-white dark:bg-gray-900 border border-[#dee0e3] dark:border-gray-700 rounded-xl overflow-hidden shadow-sm"
+                      >
+                        <div className="w-full aspect-video bg-gray-100 dark:bg-gray-800 flex items-center justify-center overflow-hidden">
+                          {it.kind === "video" ? (
+                            <video
+                              src={it.previewUrl}
+                              className="w-full h-full object-cover"
+                              controls
+                              preload="metadata"
+                              muted
+                            />
+                          ) : (
+                            <img
+                              src={it.previewUrl}
+                              alt={it.file.name}
+                              className="w-full h-full object-cover"
+                            />
+                          )}
+                        </div>
+                        <div className="p-3">
+                          <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{it.file.name}</p>
+                          <p className="text-xs text-[#6b7680] dark:text-gray-400 font-medium">
+                            {formatBytes(it.file.size)}
+                          </p>
+                          <button
+                            type="button"
+                            className="mt-2 text-xs font-semibold text-red-600 hover:text-red-700"
+                            onClick={() => handleRemoveMedia(it.id)}
+                          >
+                            Xóa
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {(isUploadingMedia || uploadedMedia.length > 0) && (
+                  <div className="mt-6 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/50 p-4 rounded-xl shadow-sm">
+                    <p className="text-sm font-bold text-red-700 dark:text-red-300">
+                      {isUploadingMedia
+                        ? "Đang upload ảnh/video..."
+                        : `Đã upload thành công: ${uploadedMedia.length} file`}
+                    </p>
+                    {resolvedRequestIdForUpload && (
+                      <p className="text-xs text-red-700/80 dark:text-red-200/80 font-medium mt-1">
+                        RequestId: {resolvedRequestIdForUpload}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </section>
