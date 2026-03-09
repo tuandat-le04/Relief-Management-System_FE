@@ -35,6 +35,19 @@ export const mapPriorityToUI = (priority) => {
   return "normal";
 };
 
+// Helper function: Chuẩn hóa mảng media objects về mảng URL string
+// API trả về: medias: [{ id, mediaUrl, mediaType, fileSize, mimeType, createdAt }]
+export const normalizeMedia = (medias) => {
+  if (!medias || !Array.isArray(medias)) return [];
+  return medias
+    .map((m) => {
+      if (typeof m === "string") return m.trim();
+      // Theo F3: field chính là "mediaUrl"
+      return m.mediaUrl ?? m.fileUrl ?? m.url ?? null;
+    })
+    .filter(Boolean);
+};
+
 // Helper function: Transform data từ API sang format UI
 export const transformRescueRequest = (item) => ({
   id: item.id,
@@ -56,7 +69,9 @@ export const transformRescueRequest = (item) => ({
   description: item.description,
   requestType: item.requestType, // Giữ nguyên requestType gốc
   requestSupplies: item.requestSupplies,
-  requestMedia: item.requestMedia,
+  // Theo F4: API trả về field "medias" là mảng object đầy đủ
+  medias: item.medias || [],
+  mediaList: normalizeMedia(item.medias), // mảng URL string chuẩn hóa dùng cho thumbnail strip
   createdAt: item.createdAt,
 });
 

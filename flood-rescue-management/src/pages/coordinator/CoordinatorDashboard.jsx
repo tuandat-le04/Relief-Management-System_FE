@@ -43,10 +43,10 @@ const CoordinatorDashboard = () => {
         r.status !== "CANCELLED",
     ).length,
     rescue: requests.filter(
-      (r) => r.type === "Cứu hộ khẩn cấp" && r.status === "CREATED",
+      (r) => r.type === "Cứu hộ khẩn cấp" && r.status === "PENDING",
     ).length,
     relief: requests.filter(
-      (r) => r.type === "Hỗ trợ cứu trợ" && r.status === "CREATED",
+      (r) => r.type === "Hỗ trợ cứu trợ" && r.status === "PENDING",
     ).length,
     inProgress: requests.filter((r) => r.status === "IN_PROGRESS").length,
     completed: requests.filter((r) => r.status === "COMPLETED").length,
@@ -102,7 +102,10 @@ const CoordinatorDashboard = () => {
 
   const handleCompleteRequest = async (requestId) => {
     try {
-      const result = await rescueRequestService.updateRequestStatus(requestId, "COMPLETED");
+      const result = await rescueRequestService.updateRequestStatus(
+        requestId,
+        "COMPLETED",
+      );
       if (result.success) {
         await refreshRequests();
         setTimeout(() => setActiveTab("completed"), 500);
@@ -117,7 +120,10 @@ const CoordinatorDashboard = () => {
   const handleCancelRequest = async (reason) => {
     if (!selectedRequest) return;
     try {
-      const result = await rescueRequestService.cancelRequest(selectedRequest.id, reason);
+      const result = await rescueRequestService.cancelRequest(
+        selectedRequest.id,
+        reason,
+      );
       if (result.success) {
         alert("✅ " + result.message);
         await refreshRequests();
@@ -148,26 +154,44 @@ const CoordinatorDashboard = () => {
   };
 
   // Modal openers
-  const openCancelModal = (request) => { setSelectedRequest(request); setCancelModalOpen(true); };
-  const openClassifyModal = (request) => { setSelectedRequest(request); setClassifyModalOpen(true); };
-  const openDetailModal = (request) => { setSelectedRequest(request); setDetailModalOpen(true); };
-  const openAssignModal = (request) => { setSelectedRequest(request); setAssignModalOpen(true); };
+  const openCancelModal = (request) => {
+    setSelectedRequest(request);
+    setCancelModalOpen(true);
+  };
+  const openClassifyModal = (request) => {
+    setSelectedRequest(request);
+    setClassifyModalOpen(true);
+  };
+  const openDetailModal = (request) => {
+    setSelectedRequest(request);
+    setDetailModalOpen(true);
+  };
+  const openAssignModal = (request) => {
+    setSelectedRequest(request);
+    setAssignModalOpen(true);
+  };
 
   // Filtered list
   const filteredRequests = requests.filter((request) => {
-    if (activeTab === "pending" && request.status !== "CREATED") return false;
-    if (activeTab === "inprogress" && request.status !== "IN_PROGRESS") return false;
-    if (activeTab === "completed" && request.status !== "COMPLETED") return false;
-    if (activeTab === "cancelled" && request.status !== "CANCELLED") return false;
+    if (activeTab === "pending" && request.status !== "PENDING") return false;
+    if (activeTab === "inprogress" && request.status !== "IN_PROGRESS")
+      return false;
+    if (activeTab === "completed" && request.status !== "COMPLETED")
+      return false;
+    if (activeTab === "cancelled" && request.status !== "CANCELLED")
+      return false;
 
     const matchesSearch =
       request.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       request.location.toLowerCase().includes(searchQuery.toLowerCase());
 
     let matchesFilter = true;
-    if (activeFilter === "rescue") matchesFilter = request.type === "Cứu hộ khẩn cấp";
-    else if (activeFilter === "relief") matchesFilter = request.type === "Hỗ trợ cứu trợ";
-    else if (activeFilter !== "all") matchesFilter = request.category === activeFilter;
+    if (activeFilter === "rescue")
+      matchesFilter = request.type === "Cứu hộ khẩn cấp";
+    else if (activeFilter === "relief")
+      matchesFilter = request.type === "Hỗ trợ cứu trợ";
+    else if (activeFilter !== "all")
+      matchesFilter = request.category === activeFilter;
 
     return matchesSearch && matchesFilter;
   });
@@ -200,11 +224,15 @@ const CoordinatorDashboard = () => {
             {loading ? (
               <div className="flex flex-col items-center justify-center py-12 gap-4">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-                <p className="text-slate-500 font-medium">Đang tải dữ liệu...</p>
+                <p className="text-slate-500 font-medium">
+                  Đang tải dữ liệu...
+                </p>
               </div>
             ) : error ? (
               <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-                <span className="material-symbols-outlined text-red-600 text-4xl mb-2">error</span>
+                <span className="material-symbols-outlined text-red-600 text-4xl mb-2">
+                  error
+                </span>
                 <p className="text-red-600 font-semibold">{error}</p>
                 <button
                   onClick={() => window.location.reload()}
@@ -215,13 +243,20 @@ const CoordinatorDashboard = () => {
               </div>
             ) : filteredRequests.length === 0 ? (
               <div className="bg-white rounded-lg p-8 text-center">
-                <span className="material-symbols-outlined text-slate-300 text-5xl mb-3">inbox</span>
-                <p className="text-slate-500 font-medium">Không có yêu cầu nào</p>
+                <span className="material-symbols-outlined text-slate-300 text-5xl mb-3">
+                  inbox
+                </span>
+                <p className="text-slate-500 font-medium">
+                  Không có yêu cầu nào
+                </p>
                 <p className="text-slate-400 text-sm mt-1">
                   {activeTab === "pending" && "Chưa có yêu cầu nào chờ xử lý"}
-                  {activeTab === "inprogress" && "Chưa có yêu cầu nào đang xử lý"}
-                  {activeTab === "completed" && "Chưa có yêu cầu nào hoàn thành"}
-                  {activeTab === "cancelled" && "Chưa có yêu cầu nào bị từ chối"}
+                  {activeTab === "inprogress" &&
+                    "Chưa có yêu cầu nào đang xử lý"}
+                  {activeTab === "completed" &&
+                    "Chưa có yêu cầu nào hoàn thành"}
+                  {activeTab === "cancelled" &&
+                    "Chưa có yêu cầu nào bị từ chối"}
                 </p>
               </div>
             ) : (
