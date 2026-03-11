@@ -232,7 +232,6 @@ const RescueTeamDashboard = () => {
   const canUpdateStatus = hasPermission(Permission.UPDATE_TASK_STATUS);
 
   const mapRef = useRef(null);
-  const reportRef = useRef(null);
   const originMarkerRef = useRef(null);
   const gpsWatchIdRef = useRef(null);
 
@@ -256,11 +255,6 @@ const RescueTeamDashboard = () => {
   });
 
   const [progressStep, setProgressStep] = useState(1); // 1..3
-
-  const [peopleRescued, setPeopleRescued] = useState(1);
-  const [healthStatus, setHealthStatus] = useState("STABLE"); // STABLE | MINOR | CRITICAL
-  const [quickNote, setQuickNote] = useState("");
-  const [submittingReport, setSubmittingReport] = useState(false);
 
   const activeRequestIdFromUrl = useMemo(() => {
     const fromQuery =
@@ -688,10 +682,6 @@ const RescueTeamDashboard = () => {
     mapRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
-  const scrollToReport = () => {
-    reportRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-
   const handleNavClick = (e, target) => {
     e.preventDefault();
     if (target === "tasks") {
@@ -900,109 +890,6 @@ const RescueTeamDashboard = () => {
     effectiveRescueTeamIdForUi !== undefined &&
     Array.isArray(request?.coordinates) &&
     request.coordinates.length === 2;
-
-  const handleSetStep = async (nextStep) => {
-    const step = clampNumber(nextStep, 1, 3);
-    setProgressStep(step);
-
-    // Only sync to backend when user has permission and we have a request
-    // Note: Backend currently exposes request status only (IN_PROGRESS/COMPLETED),
-    // so we keep 1-2 steps client-side and mark COMPLETED when report is submitted.
-    if (!canUpdateStatus) return;
-    if (!request?.id) return;
-
-    if (step < 3 && request.status !== "IN_PROGRESS") {
-      try {
-        await rescueRequestService.updateRequestStatus(request.id, "IN_PROGRESS");
-        const refreshed = await rescueRequestService.getRequestById(request.id);
-        if (refreshed.success) setRequest(refreshed.data);
-        setLastUpdatedAt(Date.now());
-      } catch {
-        // silent
-      }
-    }
-  };
-
-  const handleSubmitReport = async () => {
-    if (!request?.id) return;
-    if (!canReport) {
-      window.alert("Bạn không có quyền gửi báo cáo kết quả.");
-      return;
-    }
-
-    const people = clampNumber(peopleRescued, 0, 999);
-    if (people <= 0) {
-      window.alert("Vui lòng nhập số người đã cứu hợp lệ.");
-      return;
-    }
-
-    setSubmittingReport(true);
-    try {
-      const report = {
-        id: `${request.id}-${Date.now()}`,
-        at: Date.now(),
-        requestId: request.id,
-        missionId: mission?.id ?? null,
-        peopleRescued: people,
-        healthStatus,
-        note: quickNote,
-        gps: gps.coords,
-        submittedBy: authService.getCurrentUser()?.id ?? null,
-      };
-
-      const existing = safeParseJson(localStorage.getItem(STORAGE_KEYS.reports), []);
-      localStorage.setItem(
-        STORAGE_KEYS.reports,
-        JSON.stringify([report, ...existing].slice(0, 200)),
-      );
-
-      // Mark as completed in backend (if permission exists)
-      if (canUpdateStatus) {
-        const res = await rescueRequestService.updateRequestStatus(request.id, "COMPLETED");
-        if (!res.success) {
-          throw new Error(res.error || "Cập nhật trạng thái hoàn thành thất bại");
-        }
-        const refreshed = await rescueRequestService.getRequestById(request.id);
-        if (refreshed.success) setRequest(refreshed.data);
-      }
-
-      setProgressStep(3);
-      setLastUpdatedAt(Date.now());
-      window.alert("Đã gửi báo cáo và kết thúc nhiệm vụ.");
-    } catch (err) {
-      window.alert(err?.message || "Không thể gửi báo cáo");
-    } finally {
-      setSubmittingReport(false);
-    }
-  };
-
-  // Keep className strings strictly within the provided UI variants
-  const TASK_STEP_1_CLASS =
-    "group relative flex items-center justify-center gap-3 p-4 rounded-xl bg-white dark:bg-gray-700 border-2 border-transparent text-gray-400 hover:border-blue-200 hover:text-blue-500 transition-all opacity-50";
-  const TASK_STEP_2_CLASS =
-    "group relative flex items-center justify-center gap-3 p-4 rounded-xl bg-white dark:bg-gray-700 border-2 border-transparent text-gray-400 hover:border-orange-200 hover:text-orange-500 transition-all opacity-50";
-  const TASK_STEP_3_CLASS =
-    "group relative flex items-center justify-center gap-3 p-4 rounded-xl bg-success-green text-white shadow-lg shadow-green-500/30 transform scale-105 ring-4 ring-green-500/20 transition-all z-10";
-
-  const HEALTH_ACTIVE_CLASS =
-    "flex-1 py-3 px-2 rounded-xl bg-green-50 dark:bg-green-900/20 text-success-green border-2 border-green-500 font-bold text-sm shadow-sm";
-  const HEALTH_INACTIVE_YELLOW_CLASS =
-    "flex-1 py-3 px-2 rounded-xl bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 text-gray-500 font-bold text-sm hover:border-yellow-400 hover:text-yellow-600";
-  const HEALTH_INACTIVE_RED_CLASS =
-    "flex-1 py-3 px-2 rounded-xl bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 text-gray-500 font-bold text-sm hover:border-red-500 hover:text-red-500";
-
-  const stableBtnClasses =
-    healthStatus === "STABLE"
-      ? HEALTH_ACTIVE_CLASS
-      : HEALTH_INACTIVE_YELLOW_CLASS;
-  const minorBtnClasses =
-    healthStatus === "MINOR"
-      ? HEALTH_ACTIVE_CLASS
-      : HEALTH_INACTIVE_YELLOW_CLASS;
-  const criticalBtnClasses =
-    healthStatus === "CRITICAL"
-      ? HEALTH_ACTIVE_CLASS
-      : HEALTH_INACTIVE_RED_CLASS;
 
   const hasActiveMission =
     !loading &&
@@ -1366,97 +1253,6 @@ const RescueTeamDashboard = () => {
                         }
                       }}
                     />
-                  </div>
-
-                  <div
-                    ref={reportRef}
-                    className="bg-white dark:bg-[#2d3139] border border-gray-200 dark:border-gray-600 rounded-2xl p-6 lg:p-8 animate-[fadeIn_0.5s_ease-out]"
-                    id="report-section"
-                  >
-                    <div className="flex items-center gap-3 mb-6 pb-4 border-b border-gray-100 dark:border-gray-700">
-                      <div className="bg-green-100 dark:bg-green-900/30 p-2 rounded-lg text-success-green">
-                        <span className="material-symbols-outlined text-2xl">summarize</span>
-                      </div>
-                      <h3 className="text-xl font-black text-gray-900 dark:text-white">Báo cáo kết quả cứu hộ</h3>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-                      <div className="space-y-6">
-                        <div>
-                          <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Số người đã cứu</label>
-                          <div className="flex items-center gap-4">
-                            <button
-                              type="button"
-                              className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 text-xl font-bold text-gray-600"
-                              onClick={() => setPeopleRescued((v) => clampNumber(v - 1, 0, 999))}
-                            >
-                              -
-                            </button>
-                            <input
-                              className="w-20 h-12 text-center text-2xl font-bold bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:border-primary focus:ring-0"
-                              type="number"
-                              value={peopleRescued}
-                              onChange={(e) => setPeopleRescued(clampNumber(e.target.value, 0, 999))}
-                              min={0}
-                            />
-                            <button
-                              type="button"
-                              className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 text-xl font-bold text-gray-600"
-                              onClick={() => setPeopleRescued((v) => clampNumber(v + 1, 0, 999))}
-                            >
-                              +
-                            </button>
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Tình trạng sức khỏe</label>
-                          <div className="flex gap-2">
-                            <button
-                              type="button"
-                              className={stableBtnClasses}
-                              onClick={() => setHealthStatus("STABLE")}
-                            >
-                              Ổn định
-                            </button>
-                            <button
-                              type="button"
-                              className={minorBtnClasses}
-                              onClick={() => setHealthStatus("MINOR")}
-                            >
-                              Bị thương nhẹ
-                            </button>
-                            <button
-                              type="button"
-                              className={criticalBtnClasses}
-                              onClick={() => setHealthStatus("CRITICAL")}
-                            >
-                              Nguy kịch
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Ghi chú nhanh</label>
-                        <textarea
-                          className="w-full h-32 p-4 bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 rounded-xl text-sm font-medium focus:border-primary focus:ring-0 resize-none"
-                          placeholder="Nhập ghi chú về tình trạng nạn nhân, vật tư tiêu hao..."
-                          value={quickNote}
-                          onChange={(e) => setQuickNote(e.target.value)}
-                        ></textarea>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      className="w-full bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-200 dark:text-black text-white h-14 rounded-xl text-lg font-black shadow-xl flex items-center justify-center gap-2 transition-transform active:scale-[0.99]"
-                      onClick={handleSubmitReport}
-                      disabled={submittingReport}
-                    >
-                      <span className="material-symbols-outlined">send</span>
-                      {submittingReport ? "ĐANG GỬI..." : "GỬI BÁO CÁO & KẾT THÚC"}
-                    </button>
                   </div>
                 </div>
               </div>
