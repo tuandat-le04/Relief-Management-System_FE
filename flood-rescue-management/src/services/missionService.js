@@ -232,14 +232,14 @@ const missionService = {
     }
   },
 
-  // Phân bổ vật tư vào nhiệm vụ
-  // POST /api/v1/missions/{missionId}/assign-supplies
-  // ⚠ Theo API.md §3.3: Backend sẽ TRỪ THẲNG tồn kho ngay khi gọi API này.
-  //   HTTP 400 nếu vật tư INACTIVE hoặc số lượng vượt tồn kho thực tế.
-  assignSupplies: async (missionId, { warehouseItemId, quantity }) => {
+  // Gán vật tư vào nhiệm vụ — gọi 1 lần cho mỗi item
+  // POST /api/v1/missions/{missionId}/supplies
+  // Body: { inventoryId, quantity }
+  // ⚠ Backend sẽ TRỪ THẲNG tồn kho. HTTP 400 nếu INACTIVE hoặc vượt tồn kho.
+  assignSupplies: async (missionId, { inventoryId, quantity }) => {
     try {
-      const response = await api.post(`/missions/${missionId}/assign-supplies`, {
-        warehouseItemId,
+      const response = await api.post(`/missions/${missionId}/supplies`, {
+        inventoryId,
         quantity,
       });
       if (response.data?.success) {
