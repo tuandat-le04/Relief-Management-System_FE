@@ -140,7 +140,10 @@ const missionService = {
       const response = await api.get(`/missions?requestId=${requestId}`);
       if (response.data?.success) {
         const missions = response.data.data;
-        const mission = Array.isArray(missions) ? missions[0] : missions;
+        // Lấy mission MỚI NHẤT (id lớn nhất) thay vì missions[0] (cũ nhất)
+        const mission = Array.isArray(missions)
+          ? [...missions].sort((a, b) => b.id - a.id)[0]
+          : missions;
         return { success: true, data: mission || null };
       }
       return { success: false, error: "Không tìm thấy nhiệm vụ" };
@@ -203,6 +206,7 @@ const missionService = {
 
   // Gán phương tiện vào nhiệm vụ
   // POST /api/v1/missions/{missionId}/assign-vehicle
+  // ⚠ Theo API.md §3.1: Sau khi gán thành công, Backend tự động đổi xe sang IN_USE.
   assignVehicle: async (missionId, vehicleId) => {
     try {
       const response = await api.post(`/missions/${missionId}/assign-vehicle`, {
@@ -224,6 +228,46 @@ const missionService = {
       return {
         success: false,
         error: error.response?.data?.message || "Không thể gán phương tiện",
+      };
+    }
+  },
+
+  // Phân bổ vật tư vào nhiệm vụ
+  // POST /api/v1/missions/{missionId}/assign-supplies
+  // ⚠ Theo API.md §3.3: Backend sẽ TRỪ THẲNG tồn kho ngay khi gọi API này.
+  //   HTTP 400 nếu vật tư INACTIVE hoặc số lượng vượt tồn kho thực tế.
+  assignSupplies: async (missionId, { warehouseItemId, quantity }) => {
+    try {
+      const response = await api.post(`/missions/${missionId}/assign-supplies`, {
+        warehouseItemId,
+        quantity,
+      });
+      if (response.data?.success) {
+        return {
+          success: true,
+          message: response.data.message || "Phân bổ vật tư thành công",
+          data: response.data.data,
+        };
+      }
+      return {
+        success: false,
+        error: response.data?.message || "Phân bổ vật tư thất bại",
+      };
+    } catch (error) {
+      console.error("Error assigning supplies:", error);
+      const status = error.response?.status;
+      const msg = error.response?.data?.message;
+      if (status === 400) {
+        return {
+          success: false,
+          error:
+            msg ||
+            "Không thể phân bổ: Vật tư không hoạt động (INACTIVE) hoặc số lượng yêu cầu vượt mức tồn kho thực tế.",
+        };
+      }
+      return {
+        success: false,
+        error: msg || error.message || "Không thể phân bổ vật tư cho nhiệm vụ",
       };
     }
   },

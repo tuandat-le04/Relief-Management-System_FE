@@ -1,9 +1,11 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import avatarImg from "../../assets/images/avatar-user.png";
+import TeamStatusPanel from "./TeamStatusPanel";
 
 const Header = () => {
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showTeamPanel, setShowTeamPanel] = useState(false);
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -13,6 +15,7 @@ const Header = () => {
   };
 
   return (
+    <>
     <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3 shadow-sm">
       <div className="flex items-center gap-8">
         <div className="flex items-center gap-3">
@@ -68,6 +71,16 @@ const Header = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Nút theo dõi đội */}
+          <button
+            onClick={() => setShowTeamPanel(true)}
+            className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 rounded-lg text-sm font-medium text-slate-600 hover:text-blue-700 transition-colors group"
+            title="Xem trạng thái các đội cứu hộ"
+          >
+            <span className="material-symbols-outlined text-base group-hover:text-blue-600">groups</span>
+            <span className="hidden lg:inline">Theo dõi đội</span>
+          </button>
+
           <button className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors">
             <span className="material-symbols-outlined">notifications</span>
           </button>
@@ -153,6 +166,13 @@ const Header = () => {
         </div>
       </div>
     </header>
+
+    {/* Team Status Panel */}
+    <TeamStatusPanel
+      isOpen={showTeamPanel}
+      onClose={() => setShowTeamPanel(false)}
+    />
+    </>
   );
 };
 
