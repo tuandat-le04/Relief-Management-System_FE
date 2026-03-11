@@ -150,3 +150,63 @@ export default {
   deleteWarehouse,
   createReliefDistribution,
 };
+
+// ─── Helper functions cho AssignMissionModal ─────────────────────────────────
+
+/**
+ * Lấy danh sách kho — trả về { success, data, error }
+ * GET /api/v1/warehouses
+ */
+export const getWarehousesForModal = async () => {
+  try {
+    const response = await api.get("/warehouses");
+    if (response.data?.success && Array.isArray(response.data.data)) {
+      return { success: true, data: response.data.data };
+    }
+    if (response.data?.success) return { success: true, data: [] };
+    return {
+      success: false,
+      error: response.data?.message || "Không thể tải danh sách kho",
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error.response?.data?.message ||
+        error.message ||
+        "Không thể tải danh sách kho",
+    };
+  }
+};
+
+/**
+ * Lấy inventory của kho — trả về { success, data, error }
+ * GET /api/v1/warehouses/{id}/inventory
+ * ⚠ Normalize typo của backend: `iventoryId` (thiếu 'n') → `inventoryId`
+ */
+export const getInventoryForModal = async (warehouseId) => {
+  try {
+    const response = await api.get(`/warehouses/${warehouseId}/inventory`);
+    if (response.data?.success) {
+      const raw = response.data.data?.items ?? [];
+      const items = raw.map((item) => ({
+        ...item,
+        // backend typo: "iventoryId" → chuẩn hoá về inventoryId
+        inventoryId: item.iventoryId ?? item.inventoryId ?? item.itemId,
+      }));
+      return { success: true, data: items };
+    }
+    return {
+      success: false,
+      error: response.data?.message || "Không thể tải tồn kho",
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error.response?.data?.message ||
+        error.message ||
+        "Không thể tải tồn kho",
+    };
+  }
+};
