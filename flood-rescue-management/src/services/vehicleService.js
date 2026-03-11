@@ -60,6 +60,12 @@ export const transformVehicle = (item) => ({
   lastUpdate: item.updatedAt
     ? new Date(item.updatedAt).toLocaleString("vi-VN")
     : "Vừa xong",
+  // Khi xe IN_USE, Backend tự động đính kèm các field này (API.md §3.1, api2.md §2)
+  currentMissionId: item.currentMissionId ?? null,
+  currentRequestId: item.currentRequestId ?? null,
+  // api2.md §2: 2 trường mới — Đội đang sử dụng xe (null nếu AVAILABLE)
+  currentTeamId: item.currentTeamId ?? null,
+  currentTeamName: item.currentTeamName ?? null,
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -125,11 +131,12 @@ const vehicleService = {
     status,
   }) => {
     try {
+      // ⚠ Theo API.md §3.1: Backend tự động đặt AVAILABLE khi tạo xe mới.
+      // Không gửi trường "status" trong request.
       const body = {
         type,
         licensePlate,
         capacityPerson,
-        status: status || "AVAILABLE",
       };
       if (depotId) body.depotId = depotId;
       if (model) body.model = model;
@@ -167,10 +174,10 @@ const vehicleService = {
     { depotId, type, model, licensePlate, capacityPerson, status },
   ) => {
     try {
+      // ⚠ Theo API.md §3.1: Không gửi status — Backend quản lý trạng thái xe tự động.
       const body = { type, licensePlate, capacityPerson };
       if (depotId !== undefined) body.depotId = depotId;
       if (model !== undefined) body.model = model;
-      if (status !== undefined) body.status = status;
 
       const response = await api.put(`/vehicles/${id}`, body);
       if (response.data?.success) {
@@ -223,34 +230,24 @@ const vehicleService = {
     }
   },
 
-  // ── PUT /api/v1/vehicles/{id}/status ─────────────────────────────────────
-  // status: "AVAILABLE" | "IN_USE" | "MAINTENANCE"
-  updateVehicleStatus: async (id, status) => {
-    try {
-      const response = await api.put(`/vehicles/${id}/status`, { status });
-      if (response.data?.success) {
-        return {
-          success: true,
-          message: response.data.message || "Cập nhật trạng thái thành công",
-          data: response.data.data
-            ? transformVehicle(response.data.data)
-            : null,
-        };
-      }
-      return {
-        success: false,
-        error: response.data?.message || "Cập nhật trạng thái thất bại",
-      };
-    } catch (error) {
-      console.error(`Error updating vehicle status ${id}:`, error);
-      return {
-        success: false,
-        error:
-          error.response?.data?.message ||
-          error.message ||
-          "Không thể cập nhật trạng thái",
-      };
-    }
+  // ── [DEPRECATED] PUT /api/v1/vehicles/{id}/status ──────────────────────
+  // ⚠ API NÀY ĐÃ BỊ XÓA KHỎI BACKEND (API.md §3.1).
+  // Trạng thái xe được quản lý hoàn toàn tự động:
+  //   - Tạo xe mới       → Backend tự đặt AVAILABLE
+  //   - assign-vehicle   → Backend tự đổi sang IN_USE
+  //   - Mission COMPLETED/CANCELLED → Backend tự trả về AVAILABLE
+  // Không được gọi function này nữa.
+  updateVehicleStatus: async (_id, _status) => {
+    console.warn(
+      "⚠️ [DEPRECATED] updateVehicleStatus: API PUT /api/v1/vehicles/{id}/status đã bị xóa. " +
+      "Trạng thái xe được Backend quản lý tự động theo vòng đời nhiệm vụ."
+    );
+    return {
+      success: false,
+      error:
+        "Tính năng cập nhật trạng thái thủ công đã bị loại bỏ. " +
+        "Trạng thái xe được Backend quản lý tự động.",
+    };
   },
 
   // ── GET /api/v1/vehicles/status/{status} ──────────────────────────────────

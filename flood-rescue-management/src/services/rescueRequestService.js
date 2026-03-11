@@ -421,6 +421,7 @@ const rescueRequestService = {
       };
     }
   },
+
 };
 
 export default rescueRequestService;

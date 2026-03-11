@@ -12,21 +12,21 @@ export const getStatusBadge = (status) => {
   if (status === "IN_PROGRESS") {
     return (
       <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-600 uppercase tracking-wide">
-        ⏳ Đang xử lý
+        Đang xử lý
       </span>
     );
   }
   if (status === "COMPLETED") {
     return (
       <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700 uppercase tracking-wide">
-        ✓ Hoàn thành
+        Hoàn thành
       </span>
     );
   }
   if (status === "CANCELLED") {
     return (
       <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-600 uppercase tracking-wide">
-        ✕ Đã từ chối
+        Đã từ chối
       </span>
     );
   }
@@ -103,7 +103,9 @@ const RequestCard = ({
           <div className="flex items-center gap-2">
             {hasMedia && (
               <span className="flex items-center gap-0.5 text-[10px] font-semibold text-slate-400">
-                <span className="material-symbols-outlined text-xs">photo_library</span>
+                <span className="material-symbols-outlined text-xs">
+                  photo_library
+                </span>
                 {medias.length}
               </span>
             )}
@@ -133,7 +135,9 @@ const RequestCard = ({
                 >
                   {media.mediaType === "VIDEO" ? (
                     <div className="w-full h-full bg-slate-800 flex flex-col items-center justify-center gap-0.5">
-                      <span className="material-symbols-outlined text-white text-base">play_circle</span>
+                      <span className="material-symbols-outlined text-white text-base">
+                        play_circle
+                      </span>
                       <span className="text-white/60 text-[9px]">Video</span>
                     </div>
                   ) : (
@@ -161,8 +165,12 @@ const RequestCard = ({
                   className="flex-shrink-0 w-16 h-14 rounded-lg border border-slate-200 bg-slate-100 hover:bg-slate-200 transition-colors flex flex-col items-center justify-center gap-0.5"
                   title="Xem tất cả ảnh"
                 >
-                  <span className="material-symbols-outlined text-slate-500 text-base">more_horiz</span>
-                  <span className="text-[10px] font-bold text-slate-500">+{extraCount}</span>
+                  <span className="material-symbols-outlined text-slate-500 text-base">
+                    more_horiz
+                  </span>
+                  <span className="text-[10px] font-bold text-slate-500">
+                    +{extraCount}
+                  </span>
                 </button>
               )}
             </div>

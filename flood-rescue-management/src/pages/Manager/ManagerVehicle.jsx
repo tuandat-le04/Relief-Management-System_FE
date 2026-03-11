@@ -31,7 +31,9 @@ const VEHICLE_TYPES = [
   { value: "VAN", label: "Xe van" },
 ];
 
-const API_STATUSES = ["AVAILABLE", "IN_USE", "MAINTENANCE"];
+// ⚠ Theo API.md §3.1: Trạng thái MAINTENANCE đã bị loại bỏ khỏi hệ thống.
+// Backend quản lý tự động: tạo mới → AVAILABLE; assign-vehicle → IN_USE; COMPLETED/CANCELLED → AVAILABLE.
+const API_STATUSES = ["AVAILABLE", "IN_USE"];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const getVehicleIcon = (type) => {
@@ -140,7 +142,7 @@ const VehicleFormModal = ({ isOpen, onClose, onSuccess, editVehicle }) => {
       type: form.type,
       licensePlate: form.licensePlate,
       capacityPerson: Number(form.capacityPerson),
-      status: form.status,
+      // ⚠ Không gửi status — Backend quản lý tự động (API.md §3.1)
       ...(form.model && { model: form.model }),
       ...(form.depotId && { depotId: Number(form.depotId) }),
     };
@@ -213,46 +215,19 @@ const VehicleFormModal = ({ isOpen, onClose, onSuccess, editVehicle }) => {
               className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 mb-1">
-                Sức chứa (người) <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="number"
-                min="1"
-                value={form.capacityPerson}
-                onChange={(e) => handleChange("capacityPerson", e.target.value)}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 mb-1">
-                Trạng thái ban đầu
-              </label>
-              <select
-                value={form.status}
-                onChange={(e) => handleChange("status", e.target.value)}
-                disabled={isEdit && editVehicle?.statusRaw === "IN_USE"}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-400"
-              >
-                {API_STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {s === "AVAILABLE"
-                      ? "Sẵn sàng"
-                      : s === "IN_USE"
-                        ? "Đang vận hành"
-                        : "Bảo trì"}
-                  </option>
-                ))}
-              </select>
-              {isEdit && editVehicle?.statusRaw === "IN_USE" && (
-                <p className="text-xs text-amber-600 mt-1">
-                  ⚠ Xe đang sử dụng — dùng "Đổi trạng thái"
-                </p>
-              )}
-            </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 mb-1">
+              Sức chứa (người) <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="number"
+              min="1"
+              value={form.capacityPerson}
+              onChange={(e) => handleChange("capacityPerson", e.target.value)}
+              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            />
           </div>
+          {/* ⚠ Không có field "Trạng thái" — Backend tự động đặt AVAILABLE khi tạo, và quản lý tự động theo vòng đời nhiệm vụ (API.md §3.1) */}
           <div>
             <label className="block text-xs font-semibold text-slate-500 mb-1">
               ID bãi đậu (tuỳ chọn)
@@ -518,8 +493,6 @@ export default function ManagerVehicle() {
   // Modal states
   const [formOpen, setFormOpen] = useState(false);
   const [editVehicle, setEditVehicle] = useState(null);
-  const [statusModalOpen, setStatusModalOpen] = useState(false);
-  const [statusVehicle, setStatusVehicle] = useState(null);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleteVehicle, setDeleteVehicle] = useState(null);
 
@@ -555,10 +528,6 @@ export default function ManagerVehicle() {
   const openEditModal = (v) => {
     setEditVehicle(v);
     setFormOpen(true);
-  };
-  const openStatusModal = (v) => {
-    setStatusVehicle(v);
-    setStatusModalOpen(true);
   };
   const openDeleteModal = (v) => {
     setDeleteVehicle(v);
@@ -781,7 +750,6 @@ export default function ManagerVehicle() {
                   <option value="">Tất cả trạng thái</option>
                   <option value="AVAILABLE">✅ Sẵn sàng</option>
                   <option value="IN_USE">🔵 Đang vận hành</option>
-                  <option value="MAINTENANCE">🔧 Đang bảo trì</option>
                 </select>
               </div>
               <div className="flex items-center gap-2">
@@ -904,16 +872,14 @@ export default function ManagerVehicle() {
                               >
                                 {si.icon} {si.label}
                               </span>
+                              {vehicle.statusRaw === "IN_USE" && vehicle.currentMissionId && (
+                                <p className="text-xs text-slate-400 mt-1">
+                                  Nhiệm vụ #{vehicle.currentMissionId}
+                                </p>
+                              )}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-right">
                               <div className="flex items-center justify-end gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
-                                <button
-                                  onClick={() => openStatusModal(vehicle)}
-                                  className="px-3 py-2 rounded-xl text-xs font-bold bg-amber-100 text-amber-700 hover:bg-amber-600 hover:text-white transition-all"
-                                  title="Đổi trạng thái"
-                                >
-                                  Đổi trạng thái
-                                </button>
                                 <button
                                   onClick={() => openEditModal(vehicle)}
                                   disabled={vehicle.statusRaw === "IN_USE"}
@@ -1017,12 +983,11 @@ export default function ManagerVehicle() {
                         </p>
                       </div>
                       <div className="flex items-center gap-2 pt-4 border-t border-slate-200">
-                        <button
-                          onClick={() => openStatusModal(vehicle)}
-                          className="flex-1 px-3 py-2 rounded-xl text-xs font-bold bg-amber-100 text-amber-700 hover:bg-amber-600 hover:text-white transition-all"
-                        >
-                          Đổi trạng thái
-                        </button>
+                        {vehicle.statusRaw === "IN_USE" && vehicle.currentMissionId && (
+                          <span className="flex-1 text-xs text-slate-500 font-medium">
+                            📋 Nhiệm vụ #{vehicle.currentMissionId}
+                          </span>
+                        )}
                         <button
                           onClick={() => openEditModal(vehicle)}
                           disabled={vehicle.statusRaw === "IN_USE"}
@@ -1062,12 +1027,6 @@ export default function ManagerVehicle() {
         isOpen={formOpen}
         onClose={() => setFormOpen(false)}
         editVehicle={editVehicle}
-        onSuccess={handleActionSuccess}
-      />
-      <ChangeStatusModal
-        isOpen={statusModalOpen}
-        onClose={() => setStatusModalOpen(false)}
-        vehicle={statusVehicle}
         onSuccess={handleActionSuccess}
       />
       <DeleteConfirmModal

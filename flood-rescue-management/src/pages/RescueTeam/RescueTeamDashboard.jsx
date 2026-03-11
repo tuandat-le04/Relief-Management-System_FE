@@ -53,8 +53,7 @@ const haversineKm = (a, b) => {
   const sinDLat = Math.sin(dLat / 2);
   const sinDLng = Math.sin(dLng / 2);
   const h =
-    sinDLat * sinDLat +
-    Math.cos(lat1) * Math.cos(lat2) * sinDLng * sinDLng;
+    sinDLat * sinDLat + Math.cos(lat1) * Math.cos(lat2) * sinDLng * sinDLng;
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
 };
 
@@ -108,12 +107,16 @@ const extractRouteCoordinates = (directionJson) => {
   if (encodedA) return decodePolyline(encodedA, 5);
 
   // Format B: overview_polyline is a plain string
-  const encodedB = typeof route?.overview_polyline === "string" ? route.overview_polyline : null;
+  const encodedB =
+    typeof route?.overview_polyline === "string"
+      ? route.overview_polyline
+      : null;
   if (encodedB) return decodePolyline(encodedB, 5);
 
   // Format C: Mapbox-style geometry as GeoJSON
   const geojsonCoords = route?.geometry?.coordinates;
-  if (Array.isArray(geojsonCoords) && geojsonCoords.length > 0) return geojsonCoords;
+  if (Array.isArray(geojsonCoords) && geojsonCoords.length > 0)
+    return geojsonCoords;
 
   // Format D: Mapbox-style geometry as polyline string
   const encodedC = typeof route?.geometry === "string" ? route.geometry : null;
@@ -182,7 +185,8 @@ const createOriginBlueDotElement = () => {
 
 const waitForMapLoaded = (map) => {
   if (!map) return Promise.reject(new Error("Map chưa sẵn sàng"));
-  if (typeof map.loaded === "function" && map.loaded()) return Promise.resolve();
+  if (typeof map.loaded === "function" && map.loaded())
+    return Promise.resolve();
   return new Promise((resolve) => {
     map.once("load", resolve);
   });
@@ -199,7 +203,9 @@ const formatAxiosError = (error) => {
   const method = error?.config?.method?.toUpperCase();
   const statusPart = status ? `HTTP ${status}` : "";
   const reqPart = method && url ? `${method} ${url}` : url ? String(url) : "";
-  return ["Lỗi gọi API", statusPart, reqPart, message].filter(Boolean).join(" - ");
+  return ["Lỗi gọi API", statusPart, reqPart, message]
+    .filter(Boolean)
+    .join(" - ");
 };
 
 const getEffectiveMissionStatus = (assignment) => {
@@ -209,7 +215,8 @@ const getEffectiveMissionStatus = (assignment) => {
   // Prefer the non-PENDING status between mission.status and assignment.status.
   // Backend sometimes keeps one of them at PENDING while the other is already ASSIGNED.
   if (missionStatus && missionStatus !== "PENDING") return missionStatus;
-  if (assignmentStatus && assignmentStatus !== "PENDING") return assignmentStatus;
+  if (assignmentStatus && assignmentStatus !== "PENDING")
+    return assignmentStatus;
   return missionStatus || assignmentStatus;
 };
 
@@ -219,7 +226,9 @@ const pickFirstActionableAssignment = (list) => {
     list.find((a) => {
       if (!a?.mission) return false;
       const status = getEffectiveMissionStatus(a);
-      return status !== "PENDING" && status !== "COMPLETED" && status !== "CANCELLED";
+      return (
+        status !== "PENDING" && status !== "COMPLETED" && status !== "CANCELLED"
+      );
     }) || null
   );
 };
@@ -232,7 +241,6 @@ const RescueTeamDashboard = () => {
   const canUpdateStatus = hasPermission(Permission.UPDATE_TASK_STATUS);
 
   const mapRef = useRef(null);
-  const reportRef = useRef(null);
   const originMarkerRef = useRef(null);
   const gpsWatchIdRef = useRef(null);
 
@@ -256,11 +264,6 @@ const RescueTeamDashboard = () => {
   });
 
   const [progressStep, setProgressStep] = useState(1); // 1..3
-
-  const [peopleRescued, setPeopleRescued] = useState(1);
-  const [healthStatus, setHealthStatus] = useState("STABLE"); // STABLE | MINOR | CRITICAL
-  const [quickNote, setQuickNote] = useState("");
-  const [submittingReport, setSubmittingReport] = useState(false);
 
   const activeRequestIdFromUrl = useMemo(() => {
     const fromQuery =
@@ -293,7 +296,10 @@ const RescueTeamDashboard = () => {
     : request?.location || "Không có địa chỉ";
   const receivedTimeAgo =
     !loading && request?.createdAt ? getTimeAgo(request.createdAt) : "";
-  const lastUpdatedAgo = useMemo(() => getTimeAgo(lastUpdatedAt), [lastUpdatedAt]);
+  const lastUpdatedAgo = useMemo(
+    () => getTimeAgo(lastUpdatedAt),
+    [lastUpdatedAt],
+  );
 
   const requestTags = useMemo(() => {
     const supplies = request?.requestSupplies;
@@ -328,7 +334,10 @@ const RescueTeamDashboard = () => {
   }, [gps.coords, request?.coordinates]);
 
   const distanceLabel = useMemo(() => {
-    if (routeSummary?.distanceMeters !== null && routeSummary?.distanceMeters !== undefined) {
+    if (
+      routeSummary?.distanceMeters !== null &&
+      routeSummary?.distanceMeters !== undefined
+    ) {
       return formatDistanceFromMeters(routeSummary.distanceMeters);
     }
     if (distanceKm === null) return "—";
@@ -363,7 +372,9 @@ const RescueTeamDashboard = () => {
 
         const assignedRes = await missionService.getAssignedToMe();
         if (!assignedRes.success) {
-          throw new Error(assignedRes.error || "Không thể tải nhiệm vụ được giao");
+          throw new Error(
+            assignedRes.error || "Không thể tải nhiệm vụ được giao",
+          );
         }
 
         const assignment = pickFirstActionableAssignment(assignedRes.data);
@@ -400,7 +411,9 @@ const RescueTeamDashboard = () => {
           assignment.mission?.requestID ??
           null;
         if (requestId === null || requestId === undefined) {
-          throw new Error("Nhiệm vụ thiếu requestId (không thể hiển thị chi tiết)");
+          throw new Error(
+            "Nhiệm vụ thiếu requestId (không thể hiển thị chi tiết)",
+          );
         }
         const loadedRescueTeamId =
           assignment.rescueTeamId ??
@@ -430,14 +443,16 @@ const RescueTeamDashboard = () => {
           priority: assignment.request?.priority || detail?.priority,
           requestType: detail?.requestType || assignment.mission.missionType,
           createdAt:
-            detail?.createdAt || assignment.mission.createdAt || assignment.mission.startTime,
+            detail?.createdAt ||
+            assignment.mission.createdAt ||
+            assignment.mission.startTime,
           // Nếu detail chưa có phone/description thì UI sẽ fallback
           phone: detail?.phone || null,
           description: detail?.description || null,
           // Giữ tọa độ chính xác từ assigned-to-me
           coordinates: coordsValid
             ? [Number(lng), Number(lat)]
-            : (detail?.coordinates || null),
+            : detail?.coordinates || null,
           // Nếu backend có status của rescue request thì dùng để hiển thị/logic sau này
           status: detail?.status || assignment.mission.status || "IN_PROGRESS",
           // ĐỊA ĐIỂM/ĐỊA CHỈ: hiện API detail chưa có field address riêng,
@@ -447,7 +462,10 @@ const RescueTeamDashboard = () => {
             : "Đang cập nhật",
         };
 
-        localStorage.setItem(STORAGE_KEYS.activeRequestId, String(loadedRequest.id));
+        localStorage.setItem(
+          STORAGE_KEYS.activeRequestId,
+          String(loadedRequest.id),
+        );
 
         const missionData = {
           ...(assignment.mission || {}),
@@ -560,9 +578,12 @@ const RescueTeamDashboard = () => {
           ...(prev || {}),
           ...(detail || {}),
           id: requestId,
-          priority: assignment.request?.priority || detail?.priority || prev?.priority,
+          priority:
+            assignment.request?.priority || detail?.priority || prev?.priority,
           requestType:
-            detail?.requestType || assignment.mission.missionType || prev?.requestType,
+            detail?.requestType ||
+            assignment.mission.missionType ||
+            prev?.requestType,
           createdAt:
             detail?.createdAt ||
             assignment.mission.createdAt ||
@@ -572,7 +593,7 @@ const RescueTeamDashboard = () => {
           description: detail?.description || prev?.description || null,
           coordinates: coordsValid
             ? [Number(lng), Number(lat)]
-            : (detail?.coordinates || prev?.coordinates || null),
+            : detail?.coordinates || prev?.coordinates || null,
           status:
             detail?.status ||
             effectiveMissionStatus ||
@@ -581,7 +602,7 @@ const RescueTeamDashboard = () => {
           // ĐỊA ĐIỂM/ĐỊA CHỈ: luôn hiển thị theo tọa độ assigned-to-me
           location: coordsValid
             ? `Tọa độ: ${Number(lat).toFixed(6)}, ${Number(lng).toFixed(6)}`
-            : (prev?.location || "Đang cập nhật"),
+            : prev?.location || "Đang cập nhật",
         }));
         // Keep UI progress in sync with mission status
         if (effectiveMissionStatus === "ARRIVED") setProgressStep(2);
@@ -662,7 +683,10 @@ const RescueTeamDashboard = () => {
     gpsWatchIdRef.current = watchId;
 
     return () => {
-      if (gpsWatchIdRef.current !== null && gpsWatchIdRef.current !== undefined) {
+      if (
+        gpsWatchIdRef.current !== null &&
+        gpsWatchIdRef.current !== undefined
+      ) {
         try {
           navigator.geolocation.clearWatch(gpsWatchIdRef.current);
         } catch {
@@ -688,10 +712,6 @@ const RescueTeamDashboard = () => {
     mapRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
-  const scrollToReport = () => {
-    reportRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-
   const handleNavClick = (e, target) => {
     e.preventDefault();
     if (target === "tasks") {
@@ -714,7 +734,10 @@ const RescueTeamDashboard = () => {
       coords: gps.coords,
       user: authService.getCurrentUser()?.id ?? null,
     };
-    const existing = safeParseJson(localStorage.getItem(STORAGE_KEYS.sosEvents), []);
+    const existing = safeParseJson(
+      localStorage.getItem(STORAGE_KEYS.sosEvents),
+      [],
+    );
     localStorage.setItem(
       STORAGE_KEYS.sosEvents,
       JSON.stringify([event, ...existing].slice(0, 50)),
@@ -758,8 +781,13 @@ const RescueTeamDashboard = () => {
         currentUser?.teamID ??
         currentUser?.rescueTeam?.id ??
         null;
-      if (effectiveRescueTeamId === null || effectiveRescueTeamId === undefined) {
-        throw new Error("Thiếu rescueTeamId (chưa lấy được từ nhiệm vụ hoặc profile)");
+      if (
+        effectiveRescueTeamId === null ||
+        effectiveRescueTeamId === undefined
+      ) {
+        throw new Error(
+          "Thiếu rescueTeamId (chưa lấy được từ nhiệm vụ hoặc profile)",
+        );
       }
 
       await waitForMapLoaded(goongMap);
@@ -770,7 +798,9 @@ const RescueTeamDashboard = () => {
       try {
         posRes = await api.get(posEndpoint);
       } catch (error) {
-        throw new Error(`${formatAxiosError(error)} (endpoint: ${posEndpoint}, rescueTeamId: ${effectiveRescueTeamId})`);
+        throw new Error(
+          `${formatAxiosError(error)} (endpoint: ${posEndpoint}, rescueTeamId: ${effectiveRescueTeamId})`,
+        );
       }
       if (!posRes.data?.success) {
         throw new Error(
@@ -787,7 +817,10 @@ const RescueTeamDashboard = () => {
       const originLngLat = [originLng, originLat];
       if (!originMarkerRef.current) {
         const el = createOriginBlueDotElement();
-        originMarkerRef.current = new goongjs.Marker({ element: el, anchor: "center" })
+        originMarkerRef.current = new goongjs.Marker({
+          element: el,
+          anchor: "center",
+        })
           .setLngLat(originLngLat)
           .addTo(goongMap);
       } else {
@@ -807,7 +840,9 @@ const RescueTeamDashboard = () => {
       // Dùng key REST theo convention hiện có trong project (đang dùng cho geocode)
       const goongKey = import.meta.env.VITE_GOONG_GEOLOCATION_KEY;
       if (!goongKey) {
-        throw new Error("Thiếu VITE_GOONG_GEOLOCATION_KEY trong .env (dùng cho Direction API)");
+        throw new Error(
+          "Thiếu VITE_GOONG_GEOLOCATION_KEY trong .env (dùng cho Direction API)",
+        );
       }
 
       // Use v2 endpoint so it appears under Api v2 stats in Goong Dashboard
@@ -832,7 +867,9 @@ const RescueTeamDashboard = () => {
 
       const lineCoords = extractRouteCoordinates(directionJson);
       if (!Array.isArray(lineCoords) || lineCoords.length === 0) {
-        throw new Error("Không đọc được dữ liệu tuyến đường từ Direction response");
+        throw new Error(
+          "Không đọc được dữ liệu tuyến đường từ Direction response",
+        );
       }
 
       // 3) Add/Update source + layer để vẽ đường đứt nét
@@ -901,109 +938,6 @@ const RescueTeamDashboard = () => {
     Array.isArray(request?.coordinates) &&
     request.coordinates.length === 2;
 
-  const handleSetStep = async (nextStep) => {
-    const step = clampNumber(nextStep, 1, 3);
-    setProgressStep(step);
-
-    // Only sync to backend when user has permission and we have a request
-    // Note: Backend currently exposes request status only (IN_PROGRESS/COMPLETED),
-    // so we keep 1-2 steps client-side and mark COMPLETED when report is submitted.
-    if (!canUpdateStatus) return;
-    if (!request?.id) return;
-
-    if (step < 3 && request.status !== "IN_PROGRESS") {
-      try {
-        await rescueRequestService.updateRequestStatus(request.id, "IN_PROGRESS");
-        const refreshed = await rescueRequestService.getRequestById(request.id);
-        if (refreshed.success) setRequest(refreshed.data);
-        setLastUpdatedAt(Date.now());
-      } catch {
-        // silent
-      }
-    }
-  };
-
-  const handleSubmitReport = async () => {
-    if (!request?.id) return;
-    if (!canReport) {
-      window.alert("Bạn không có quyền gửi báo cáo kết quả.");
-      return;
-    }
-
-    const people = clampNumber(peopleRescued, 0, 999);
-    if (people <= 0) {
-      window.alert("Vui lòng nhập số người đã cứu hợp lệ.");
-      return;
-    }
-
-    setSubmittingReport(true);
-    try {
-      const report = {
-        id: `${request.id}-${Date.now()}`,
-        at: Date.now(),
-        requestId: request.id,
-        missionId: mission?.id ?? null,
-        peopleRescued: people,
-        healthStatus,
-        note: quickNote,
-        gps: gps.coords,
-        submittedBy: authService.getCurrentUser()?.id ?? null,
-      };
-
-      const existing = safeParseJson(localStorage.getItem(STORAGE_KEYS.reports), []);
-      localStorage.setItem(
-        STORAGE_KEYS.reports,
-        JSON.stringify([report, ...existing].slice(0, 200)),
-      );
-
-      // Mark as completed in backend (if permission exists)
-      if (canUpdateStatus) {
-        const res = await rescueRequestService.updateRequestStatus(request.id, "COMPLETED");
-        if (!res.success) {
-          throw new Error(res.error || "Cập nhật trạng thái hoàn thành thất bại");
-        }
-        const refreshed = await rescueRequestService.getRequestById(request.id);
-        if (refreshed.success) setRequest(refreshed.data);
-      }
-
-      setProgressStep(3);
-      setLastUpdatedAt(Date.now());
-      window.alert("Đã gửi báo cáo và kết thúc nhiệm vụ.");
-    } catch (err) {
-      window.alert(err?.message || "Không thể gửi báo cáo");
-    } finally {
-      setSubmittingReport(false);
-    }
-  };
-
-  // Keep className strings strictly within the provided UI variants
-  const TASK_STEP_1_CLASS =
-    "group relative flex items-center justify-center gap-3 p-4 rounded-xl bg-white dark:bg-gray-700 border-2 border-transparent text-gray-400 hover:border-blue-200 hover:text-blue-500 transition-all opacity-50";
-  const TASK_STEP_2_CLASS =
-    "group relative flex items-center justify-center gap-3 p-4 rounded-xl bg-white dark:bg-gray-700 border-2 border-transparent text-gray-400 hover:border-orange-200 hover:text-orange-500 transition-all opacity-50";
-  const TASK_STEP_3_CLASS =
-    "group relative flex items-center justify-center gap-3 p-4 rounded-xl bg-success-green text-white shadow-lg shadow-green-500/30 transform scale-105 ring-4 ring-green-500/20 transition-all z-10";
-
-  const HEALTH_ACTIVE_CLASS =
-    "flex-1 py-3 px-2 rounded-xl bg-green-50 dark:bg-green-900/20 text-success-green border-2 border-green-500 font-bold text-sm shadow-sm";
-  const HEALTH_INACTIVE_YELLOW_CLASS =
-    "flex-1 py-3 px-2 rounded-xl bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 text-gray-500 font-bold text-sm hover:border-yellow-400 hover:text-yellow-600";
-  const HEALTH_INACTIVE_RED_CLASS =
-    "flex-1 py-3 px-2 rounded-xl bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 text-gray-500 font-bold text-sm hover:border-red-500 hover:text-red-500";
-
-  const stableBtnClasses =
-    healthStatus === "STABLE"
-      ? HEALTH_ACTIVE_CLASS
-      : HEALTH_INACTIVE_YELLOW_CLASS;
-  const minorBtnClasses =
-    healthStatus === "MINOR"
-      ? HEALTH_ACTIVE_CLASS
-      : HEALTH_INACTIVE_YELLOW_CLASS;
-  const criticalBtnClasses =
-    healthStatus === "CRITICAL"
-      ? HEALTH_ACTIVE_CLASS
-      : HEALTH_INACTIVE_RED_CLASS;
-
   const hasActiveMission =
     !loading &&
     !!mission &&
@@ -1018,16 +952,24 @@ const RescueTeamDashboard = () => {
         <div className="flex items-center gap-8">
           <div className="flex items-center gap-3">
             <div className="bg-primary p-2 rounded-lg text-white shadow-lg shadow-primary/30">
-              <span className="material-symbols-outlined block text-2xl">emergency</span>
+              <span className="material-symbols-outlined block text-2xl">
+                emergency
+              </span>
             </div>
             <div>
-              <h2 className="text-[#131416] dark:text-white text-xl font-black leading-tight tracking-tight uppercase">Cứu Hộ VN</h2>
-              <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">Team Alpha-1</p>
+              <h2 className="text-[#131416] dark:text-white text-xl font-black leading-tight tracking-tight uppercase">
+                Cứu Hộ VN
+              </h2>
+              <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">
+                Team Alpha-1
+              </p>
             </div>
           </div>
           <div className="hidden md:flex items-center bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-full px-4 py-1.5">
             <span className="w-2 h-2 rounded-full bg-success-green animate-pulse mr-2"></span>
-            <span className="text-success-green text-xs font-bold uppercase">Hệ thống trực tuyến</span>
+            <span className="text-success-green text-xs font-bold uppercase">
+              Hệ thống trực tuyến
+            </span>
           </div>
         </div>
         <div className="flex items-center gap-4 lg:gap-6">
@@ -1077,8 +1019,12 @@ const RescueTeamDashboard = () => {
       <main className="max-w-[1600px] mx-auto flex flex-col lg:flex-row h-[calc(100vh-73px)] overflow-hidden">
         <aside className="hidden lg:flex flex-col w-72 border-r border-[#e5e7eb] dark:border-[#374151] bg-white dark:bg-[#1c1e22] p-4 gap-6 z-20 shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
           <div className="px-2">
-            <h1 className="text-[#131416] dark:text-white text-xl font-black mb-1">Đội Cứu Hộ 01</h1>
-            <p className="text-sm text-gray-500 font-medium">Khu vực: Quận 1 - Bình Thạnh</p>
+            <h1 className="text-[#131416] dark:text-white text-xl font-black mb-1">
+              Đội Cứu Hộ 01
+            </h1>
+            <p className="text-sm text-gray-500 font-medium">
+              Khu vực: Quận 1 - Bình Thạnh
+            </p>
           </div>
           <nav className="flex flex-col gap-2 flex-1">
             <div className="flex items-center justify-between px-4 py-3 rounded-xl bg-primary text-white shadow-lg shadow-primary/25">
@@ -1086,7 +1032,9 @@ const RescueTeamDashboard = () => {
                 <span className="material-symbols-outlined">assignment</span>
                 <p className="text-sm font-bold">Nhiệm vụ</p>
               </div>
-              <span className="bg-white/20 px-2.5 py-0.5 rounded text-xs font-bold">{hasActiveMission ? 1 : 0}</span>
+              <span className="bg-white/20 px-2.5 py-0.5 rounded text-xs font-bold">
+                {hasActiveMission ? 1 : 0}
+              </span>
             </div>
             <div
               className="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
@@ -1107,11 +1055,19 @@ const RescueTeamDashboard = () => {
           </nav>
           <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-800">
             <div className="flex items-start gap-3">
-              <span className="material-symbols-outlined text-primary">cloud</span>
+              <span className="material-symbols-outlined text-primary">
+                cloud
+              </span>
               <div>
-                <p className="text-xs font-bold text-gray-500 uppercase">Thời tiết hiện tại</p>
-                <p className="text-sm font-bold text-gray-900 dark:text-white">Mưa lớn, Ngập cục bộ</p>
-                <p className="text-xs text-primary font-bold mt-1">26°C - Gió ĐN 15km/h</p>
+                <p className="text-xs font-bold text-gray-500 uppercase">
+                  Thời tiết hiện tại
+                </p>
+                <p className="text-sm font-bold text-gray-900 dark:text-white">
+                  Mưa lớn, Ngập cục bộ
+                </p>
+                <p className="text-xs text-primary font-bold mt-1">
+                  26°C - Gió ĐN 15km/h
+                </p>
               </div>
             </div>
           </div>
@@ -1123,12 +1079,17 @@ const RescueTeamDashboard = () => {
               <div className="w-full max-w-xl bg-white dark:bg-[#1c1e22] border border-gray-200 dark:border-gray-700 rounded-2xl p-8 shadow-xl">
                 <div className="flex items-start gap-4">
                   <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-3">
-                    <span className="material-symbols-outlined text-success-green text-3xl">task_alt</span>
+                    <span className="material-symbols-outlined text-success-green text-3xl">
+                      task_alt
+                    </span>
                   </div>
                   <div className="flex-1">
-                    <h2 className="text-xl font-black text-gray-900 dark:text-white">Không có nhiệm vụ đang thực hiện</h2>
+                    <h2 className="text-xl font-black text-gray-900 dark:text-white">
+                      Không có nhiệm vụ đang thực hiện
+                    </h2>
                     <p className="mt-1 text-sm text-gray-500 font-medium">
-                      Nhiệm vụ đã hoàn thành hoặc hệ thống chưa phân công nhiệm vụ mới cho đội.
+                      Nhiệm vụ đã hoàn thành hoặc hệ thống chưa phân công nhiệm
+                      vụ mới cho đội.
                     </p>
                     <p className="mt-4 text-xs text-gray-400 font-bold uppercase tracking-widest">
                       Trạng thái: Sẵn sàng nhận nhiệm vụ
@@ -1139,328 +1100,317 @@ const RescueTeamDashboard = () => {
             </div>
           ) : (
             <div className="h-full grid grid-cols-1 xl:grid-cols-12 overflow-hidden">
-            <div className="xl:col-span-4 flex flex-col border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-[#1c1e22] h-full overflow-hidden shadow-xl z-10">
-              <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-[#1c1e22]">
-                <div className="flex items-center justify-between mb-2">
-                  <h2 className="text-xl font-black text-gray-900 dark:text-white uppercase tracking-tight">Nhiệm Vụ Hiện Tại</h2>
-                  <div className="flex items-center gap-2">
-                    <span className="relative flex h-3 w-3">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-                    </span>
-                    <span className="text-xs font-bold text-red-600 dark:text-red-400 uppercase">Đang xử lý</span>
-                  </div>
-                </div>
-                <p className="text-sm text-gray-500 font-medium">Bạn đang phụ trách 01 nhiệm vụ duy nhất.</p>
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-black/10">
-                <div className="bg-white dark:bg-[#2d3139] border border-gray-200 dark:border-gray-700 rounded-2xl p-6 shadow-xl relative overflow-hidden group hover:border-primary/50 transition-colors">
-                  <div className="absolute -right-6 -top-6 text-gray-100 dark:text-gray-700 pointer-events-none transform rotate-12">
-                    <span className="material-symbols-outlined text-[120px] opacity-30">emergency</span>
-                  </div>
-                  <div className="relative z-10">
-                    <div className="flex justify-between items-start mb-4">
-                      <span className="bg-urgency-high/10 text-urgency-high px-3 py-1 rounded-md text-xs font-black uppercase tracking-wider border border-urgency-high/20">
-                        {priorityLabel}
+              <div className="xl:col-span-4 flex flex-col border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-[#1c1e22] h-full overflow-hidden shadow-xl z-10">
+                <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-[#1c1e22]">
+                  <div className="flex items-center justify-between mb-2">
+                    <h2 className="text-xl font-black text-gray-900 dark:text-white uppercase tracking-tight">
+                      Nhiệm Vụ Hiện Tại
+                    </h2>
+                    <div className="flex items-center gap-2">
+                      <span className="relative flex h-3 w-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
                       </span>
-                      <span className="text-xs font-bold text-gray-400">{displayRequestCode}</span>
-                    </div>
-                    <h3 className="text-2xl font-black text-gray-900 dark:text-white mb-2 leading-tight">{victimName}</h3>
-                    <p className="text-sm font-bold text-urgency-critical mb-5 flex items-center gap-1">
-                      <span className="material-symbols-outlined text-lg">warning</span>
-                      {request?.requestType === "RESCUE"
-                        ? "CỨU HỘ KHẨN CẤP"
-                        : request?.requestType === "RELIEF"
-                          ? "HỖ TRỢ CỨU TRỢ"
-                          : "YÊU CẦU KHẨN"}
-                    </p>
-                    <div className="space-y-4 mb-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700">
-                      <div className="flex items-start gap-3">
-                        <span className="material-symbols-outlined text-primary mt-0.5">location_on</span>
-                        <div>
-                          <p className="text-xs font-bold text-gray-500 uppercase mb-0.5">Địa điểm</p>
-                          <p className="text-sm font-bold text-gray-900 dark:text-white leading-snug">{victimAddress}</p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="pt-2">
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="font-bold text-gray-500">Thời gian nhận tin</span>
-                        <span className="font-bold text-gray-900 dark:text-white">{progressTimeLabel}</span>
-                      </div>
-                      <div className="w-full bg-gray-200 dark:bg-gray-700 h-1.5 rounded-full mt-2 overflow-hidden">
-                        <div
-                          className="bg-blue-600 h-full w-1/3 animate-pulse"
-                          style={{ width: `${progressPercent}%` }}
-                        ></div>
-                      </div>
-                      <p className="text-[10px] text-blue-600 font-bold mt-1 text-right">{progressText}</p>
+                      <span className="text-xs font-bold text-red-600 dark:text-red-400 uppercase">
+                        Đang xử lý
+                      </span>
                     </div>
                   </div>
-                  <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-gradient-to-r from-urgency-high to-urgency-critical"></div>
-                </div>
-                <div className="mt-8 text-center px-4">
-                  <span className="material-symbols-outlined text-4xl text-gray-300 dark:text-gray-600 mb-2">my_location</span>
-                  <p className="text-xs text-gray-400 font-medium italic">
-                    Tập trung hoàn thành nhiệm vụ này. Hệ thống sẽ không phân công thêm nhiệm vụ mới cho đến khi bạn báo cáo hoàn thành.
+                  <p className="text-sm text-gray-500 font-medium">
+                    Bạn đang phụ trách 01 nhiệm vụ duy nhất.
                   </p>
                 </div>
-              </div>
-            </div>
 
-            <div className="xl:col-span-8 overflow-y-auto bg-gray-50 dark:bg-black/20 h-full">
-              <div className="p-4 lg:p-8 max-w-5xl mx-auto space-y-6">
-                <div className="bg-white dark:bg-[#1c1e22] rounded-2xl shadow-xl overflow-hidden border border-gray-200 dark:border-gray-700">
-                  <div className="bg-gradient-to-r from-gray-800 to-gray-900 px-6 py-4 flex flex-wrap items-center justify-between text-white gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className="bg-urgency-high p-2 rounded text-white shadow-lg">
-                        <span className="material-symbols-outlined block">priority_high</span>
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-0.5">Nhiệm vụ trọng tâm</p>
-                        <h2 className="text-lg font-black leading-none">CỨU HỘ KHẨN CẤP {displayRequestCode}</h2>
-                      </div>
+                <div className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-black/10">
+                  <div className="bg-white dark:bg-[#2d3139] border border-gray-200 dark:border-gray-700 rounded-2xl p-6 shadow-xl relative overflow-hidden group hover:border-primary/50 transition-colors">
+                    <div className="absolute -right-6 -top-6 text-gray-100 dark:text-gray-700 pointer-events-none transform rotate-12">
+                      <span className="material-symbols-outlined text-[120px] opacity-30">
+                        emergency
+                      </span>
                     </div>
-                    <div className="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-lg border border-white/10">
-                      <span className="material-symbols-outlined text-sm">schedule</span>
-                      <span className="text-sm font-bold">Cập nhật: {lastUpdatedAgo}</span>
-                    </div>
-                  </div>
-
-                  <div className="p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    <div className="space-y-6">
-                      <div>
-                        <p className="text-gray-500 text-xs font-bold uppercase mb-1">Nạn nhân</p>
-                        <h2 className="text-4xl lg:text-5xl font-black text-gray-900 dark:text-white tracking-tight">{victimName}</h2>
-                        <a
-                          className="inline-flex items-center gap-3 text-3xl lg:text-4xl text-primary font-black mt-2 hover:text-blue-600 transition-colors"
-                          href={victimPhone ? `tel:${victimPhone}` : "#"}
-                          onClick={(e) => {
-                            if (!victimPhone) e.preventDefault();
-                          }}
-                        >
-                          <span className="material-symbols-outlined text-4xl filled">call</span>
-                          {victimPhone ? formatPhone(victimPhone) : "Chưa có SĐT"}
-                        </a>
+                    <div className="relative z-10">
+                      <div className="flex justify-between items-start mb-4">
+                        <span className="bg-urgency-high/10 text-urgency-high px-3 py-1 rounded-md text-xs font-black uppercase tracking-wider border border-urgency-high/20">
+                          {priorityLabel}
+                        </span>
+                        <span className="text-xs font-bold text-gray-400">
+                          {displayRequestCode}
+                        </span>
                       </div>
-
-                      <div className="bg-yellow-50 dark:bg-yellow-900/20 border-l-8 border-yellow-400 p-5 rounded-r-xl">
-                        <p className="text-yellow-700 dark:text-yellow-500 text-xs font-black uppercase mb-2 flex items-center gap-1">
-                          <span className="material-symbols-outlined text-sm">info</span>
-                          Tình trạng &amp; Ghi chú đặc biệt
-                        </p>
-                        <p className="text-xl lg:text-2xl font-bold text-gray-900 dark:text-white leading-snug">
-                          {request?.description ? (
-                            <>{request.description}</>
-                          ) : (
-                            <>
-                              Chưa có ghi chú chi tiết. <br />
-                              <span className="bg-yellow-200 dark:bg-yellow-700 px-1">Đang cập nhật</span>
-                            </>
-                          )}
-                        </p>
-                        <div className="mt-3 flex gap-2 flex-wrap">
-                          {requestTags.slice(0, 2).map((tag) => (
-                            <span
-                              key={tag}
-                              className="bg-white dark:bg-gray-800 px-3 py-1 rounded border border-yellow-200 dark:border-gray-600 text-sm font-bold text-gray-700 dark:text-gray-300"
-                            >
-                              {tag}
-                            </span>
-                          ))}
-                          {requestTags.length === 0 && (
-                            <>
-                              <span className="bg-white dark:bg-gray-800 px-3 py-1 rounded border border-yellow-200 dark:border-gray-600 text-sm font-bold text-gray-700 dark:text-gray-300">Cao huyết áp</span>
-                              <span className="bg-white dark:bg-gray-800 px-3 py-1 rounded border border-yellow-200 dark:border-gray-600 text-sm font-bold text-gray-700 dark:text-gray-300">Cần cáng cứu thương</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-
-                      <div>
-                        <p className="text-gray-500 text-xs font-bold uppercase mb-2">Địa chỉ chính xác</p>
-                        <div className="flex items-start gap-3 bg-gray-50 dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
-                          <span className="material-symbols-outlined text-red-500 mt-1 text-2xl">pin_drop</span>
+                      <h3 className="text-2xl font-black text-gray-900 dark:text-white mb-2 leading-tight">
+                        {victimName}
+                      </h3>
+                      <p className="text-sm font-bold text-urgency-critical mb-5 flex items-center gap-1">
+                        <span className="material-symbols-outlined text-lg">
+                          warning
+                        </span>
+                        {request?.requestType === "RESCUE"
+                          ? "CỨU HỘ KHẨN CẤP"
+                          : request?.requestType === "RELIEF"
+                            ? "HỖ TRỢ CỨU TRỢ"
+                            : "YÊU CẦU KHẨN"}
+                      </p>
+                      <div className="space-y-4 mb-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700">
+                        <div className="flex items-start gap-3">
+                          <span className="material-symbols-outlined text-primary mt-0.5">
+                            location_on
+                          </span>
                           <div>
-                            <p className="text-xl font-bold text-gray-900 dark:text-white leading-tight">{victimAddress}</p>
-                            <p className="text-sm font-medium text-gray-500 mt-1">Cách vị trí hiện tại: {distanceLabel}</p>
+                            <p className="text-xs font-bold text-gray-500 uppercase mb-0.5">
+                              Địa điểm
+                            </p>
+                            <p className="text-sm font-bold text-gray-900 dark:text-white leading-snug">
+                              {victimAddress}
+                            </p>
                           </div>
                         </div>
                       </div>
-                    </div>
-
-                    <div
-                      ref={mapRef}
-                      className="flex flex-col h-full min-h-[400px] bg-gray-100 dark:bg-gray-800 rounded-2xl overflow-hidden border-2 border-white dark:border-gray-600 shadow-lg relative group"
-                    >
-                      <div className="absolute inset-0">
-                        <AssignedMissionMapGoong
-                          latitude={request?.coordinates?.[1]}
-                          longitude={request?.coordinates?.[0]}
-                          onMapReady={setGoongMap}
-                        />
-                      </div>
-                      <div className="absolute top-4 left-4 right-4 flex justify-between items-start pointer-events-none">
-                        <div className="bg-white/90 backdrop-blur dark:bg-gray-900/90 px-3 py-2 rounded-lg shadow-md pointer-events-auto">
-                          <p className="text-xs font-bold text-gray-500 uppercase">GPS Đội cứu hộ</p>
-                          <div className="flex items-center gap-1 text-green-600 font-bold">
-                            <span className="material-symbols-outlined text-sm">my_location</span>
-                            <span>
-                              {gps.status === "ready"
-                                ? "Đang cập nhật..."
-                                : gps.status === "error"
-                                  ? "Không khả dụng"
-                                  : "Đang cập nhật..."}
-                            </span>
-                          </div>
+                      <div className="pt-2">
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="font-bold text-gray-500">
+                            Thời gian nhận tin
+                          </span>
+                          <span className="font-bold text-gray-900 dark:text-white">
+                            {progressTimeLabel}
+                          </span>
                         </div>
-                        <div
-                          className="bg-white/90 backdrop-blur dark:bg-gray-900/90 p-2 rounded-lg shadow-md pointer-events-auto cursor-pointer hover:bg-white dark:hover:bg-gray-800"
-                          role="button"
-                          tabIndex={0}
-                          onClick={handleStartNavigation}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") handleStartNavigation();
-                          }}
-                        >
-                          <span className="material-symbols-outlined text-gray-700 dark:text-gray-300">layers</span>
+                        <div className="w-full bg-gray-200 dark:bg-gray-700 h-1.5 rounded-full mt-2 overflow-hidden">
+                          <div
+                            className="bg-blue-600 h-full w-1/3 animate-pulse"
+                            style={{ width: `${progressPercent}%` }}
+                          ></div>
                         </div>
-                      </div>
-
-                      <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
-                        <button
-                          type="button"
-                          disabled={!canStartNavigation}
-                          className={`w-full bg-blue-600 hover:bg-blue-500 text-white h-14 rounded-xl flex items-center justify-center gap-2 text-lg font-black shadow-xl transition-all transform active:scale-[0.98] border-2 border-blue-400/50 ${
-                            canStartNavigation
-                              ? ""
-                              : "opacity-60 cursor-not-allowed hover:bg-blue-600"
-                          }`}
-                          onClick={handleStartNavigation}
-                        >
-                          <span className="material-symbols-outlined text-3xl">turn_right</span>
-                          {startingNavigation ? "ĐANG TẢI..." : "BẮT ĐẦU DẪN ĐƯỜNG"}
-                        </button>
+                        <p className="text-[10px] text-blue-600 font-bold mt-1 text-right">
+                          {progressText}
+                        </p>
                       </div>
                     </div>
+                    <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-gradient-to-r from-urgency-high to-urgency-critical"></div>
+                  </div>
+                  <div className="mt-8 text-center px-4">
+                    <span className="material-symbols-outlined text-4xl text-gray-300 dark:text-gray-600 mb-2">
+                      my_location
+                    </span>
+                    <p className="text-xs text-gray-400 font-medium italic">
+                      Tập trung hoàn thành nhiệm vụ này. Hệ thống sẽ không phân
+                      công thêm nhiệm vụ mới cho đến khi bạn báo cáo hoàn thành.
+                    </p>
                   </div>
                 </div>
+              </div>
 
-                <div className="bg-gray-50 dark:bg-gray-800/50 border-t border-gray-200 dark:border-gray-700 p-6 lg:p-8">
-                  <h3 className="text-center text-gray-400 text-xs font-bold uppercase tracking-[0.2em] mb-6">Tiến độ thực hiện</h3>
-                  <div className="mb-8">
-                    <MissionProgress
-                      missionId={mission?.id}
-                      initialStatus={mission?.status || "IN_PROGRESS"}
-                      onStatusChange={(nextStatus) => {
-                        setMission((prev) => (prev ? { ...prev, status: nextStatus } : prev));
-                        if (nextStatus === "ARRIVED") setProgressStep(2);
-                        if (nextStatus === "COMPLETED") {
-                          setProgressStep(3);
-                          localStorage.removeItem(STORAGE_KEYS.activeRequestId);
-                          setRouteSummary(null);
-                          setNavigationActive(false);
-                          setRequest(null);
-                          setMission(null);
-                        }
-                      }}
-                    />
-                  </div>
-
-                  <div
-                    ref={reportRef}
-                    className="bg-white dark:bg-[#2d3139] border border-gray-200 dark:border-gray-600 rounded-2xl p-6 lg:p-8 animate-[fadeIn_0.5s_ease-out]"
-                    id="report-section"
-                  >
-                    <div className="flex items-center gap-3 mb-6 pb-4 border-b border-gray-100 dark:border-gray-700">
-                      <div className="bg-green-100 dark:bg-green-900/30 p-2 rounded-lg text-success-green">
-                        <span className="material-symbols-outlined text-2xl">summarize</span>
+              <div className="xl:col-span-8 overflow-y-auto bg-gray-50 dark:bg-black/20 h-full">
+                <div className="p-4 lg:p-8 max-w-5xl mx-auto space-y-6">
+                  <div className="bg-white dark:bg-[#1c1e22] rounded-2xl shadow-xl overflow-hidden border border-gray-200 dark:border-gray-700">
+                    <div className="bg-gradient-to-r from-gray-800 to-gray-900 px-6 py-4 flex flex-wrap items-center justify-between text-white gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="bg-urgency-high p-2 rounded text-white shadow-lg">
+                          <span className="material-symbols-outlined block">
+                            priority_high
+                          </span>
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-0.5">
+                            Nhiệm vụ trọng tâm
+                          </p>
+                          <h2 className="text-lg font-black leading-none">
+                            CỨU HỘ KHẨN CẤP {displayRequestCode}
+                          </h2>
+                        </div>
                       </div>
-                      <h3 className="text-xl font-black text-gray-900 dark:text-white">Báo cáo kết quả cứu hộ</h3>
+                      <div className="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-lg border border-white/10">
+                        <span className="material-symbols-outlined text-sm">
+                          schedule
+                        </span>
+                        <span className="text-sm font-bold">
+                          Cập nhật: {lastUpdatedAgo}
+                        </span>
+                      </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                    <div className="p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
                       <div className="space-y-6">
                         <div>
-                          <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Số người đã cứu</label>
-                          <div className="flex items-center gap-4">
-                            <button
-                              type="button"
-                              className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 text-xl font-bold text-gray-600"
-                              onClick={() => setPeopleRescued((v) => clampNumber(v - 1, 0, 999))}
-                            >
-                              -
-                            </button>
-                            <input
-                              className="w-20 h-12 text-center text-2xl font-bold bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:border-primary focus:ring-0"
-                              type="number"
-                              value={peopleRescued}
-                              onChange={(e) => setPeopleRescued(clampNumber(e.target.value, 0, 999))}
-                              min={0}
-                            />
-                            <button
-                              type="button"
-                              className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 text-xl font-bold text-gray-600"
-                              onClick={() => setPeopleRescued((v) => clampNumber(v + 1, 0, 999))}
-                            >
-                              +
-                            </button>
+                          <p className="text-gray-500 text-xs font-bold uppercase mb-1">
+                            Nạn nhân
+                          </p>
+                          <h2 className="text-4xl lg:text-5xl font-black text-gray-900 dark:text-white tracking-tight">
+                            {victimName}
+                          </h2>
+                          <a
+                            className="inline-flex items-center gap-3 text-3xl lg:text-4xl text-primary font-black mt-2 hover:text-blue-600 transition-colors"
+                            href={victimPhone ? `tel:${victimPhone}` : "#"}
+                            onClick={(e) => {
+                              if (!victimPhone) e.preventDefault();
+                            }}
+                          >
+                            <span className="material-symbols-outlined text-4xl filled">
+                              call
+                            </span>
+                            {victimPhone
+                              ? formatPhone(victimPhone)
+                              : "Chưa có SĐT"}
+                          </a>
+                        </div>
+
+                        <div className="bg-yellow-50 dark:bg-yellow-900/20 border-l-8 border-yellow-400 p-5 rounded-r-xl">
+                          <p className="text-yellow-700 dark:text-yellow-500 text-xs font-black uppercase mb-2 flex items-center gap-1">
+                            <span className="material-symbols-outlined text-sm">
+                              info
+                            </span>
+                            Tình trạng &amp; Ghi chú đặc biệt
+                          </p>
+                          <p className="text-xl lg:text-2xl font-bold text-gray-900 dark:text-white leading-snug">
+                            {request?.description ? (
+                              <>{request.description}</>
+                            ) : (
+                              <>
+                                Chưa có ghi chú chi tiết. <br />
+                                <span className="bg-yellow-200 dark:bg-yellow-700 px-1">
+                                  Đang cập nhật
+                                </span>
+                              </>
+                            )}
+                          </p>
+                          <div className="mt-3 flex gap-2 flex-wrap">
+                            {requestTags.slice(0, 2).map((tag) => (
+                              <span
+                                key={tag}
+                                className="bg-white dark:bg-gray-800 px-3 py-1 rounded border border-yellow-200 dark:border-gray-600 text-sm font-bold text-gray-700 dark:text-gray-300"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                            {requestTags.length === 0 && (
+                              <>
+                                <span className="bg-white dark:bg-gray-800 px-3 py-1 rounded border border-yellow-200 dark:border-gray-600 text-sm font-bold text-gray-700 dark:text-gray-300">
+                                  Cao huyết áp
+                                </span>
+                                <span className="bg-white dark:bg-gray-800 px-3 py-1 rounded border border-yellow-200 dark:border-gray-600 text-sm font-bold text-gray-700 dark:text-gray-300">
+                                  Cần cáng cứu thương
+                                </span>
+                              </>
+                            )}
                           </div>
                         </div>
 
                         <div>
-                          <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Tình trạng sức khỏe</label>
-                          <div className="flex gap-2">
-                            <button
-                              type="button"
-                              className={stableBtnClasses}
-                              onClick={() => setHealthStatus("STABLE")}
-                            >
-                              Ổn định
-                            </button>
-                            <button
-                              type="button"
-                              className={minorBtnClasses}
-                              onClick={() => setHealthStatus("MINOR")}
-                            >
-                              Bị thương nhẹ
-                            </button>
-                            <button
-                              type="button"
-                              className={criticalBtnClasses}
-                              onClick={() => setHealthStatus("CRITICAL")}
-                            >
-                              Nguy kịch
-                            </button>
+                          <p className="text-gray-500 text-xs font-bold uppercase mb-2">
+                            Địa chỉ chính xác
+                          </p>
+                          <div className="flex items-start gap-3 bg-gray-50 dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
+                            <span className="material-symbols-outlined text-red-500 mt-1 text-2xl">
+                              pin_drop
+                            </span>
+                            <div>
+                              <p className="text-xl font-bold text-gray-900 dark:text-white leading-tight">
+                                {victimAddress}
+                              </p>
+                              <p className="text-sm font-medium text-gray-500 mt-1">
+                                Cách vị trí hiện tại: {distanceLabel}
+                              </p>
+                            </div>
                           </div>
                         </div>
                       </div>
 
-                      <div>
-                        <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Ghi chú nhanh</label>
-                        <textarea
-                          className="w-full h-32 p-4 bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 rounded-xl text-sm font-medium focus:border-primary focus:ring-0 resize-none"
-                          placeholder="Nhập ghi chú về tình trạng nạn nhân, vật tư tiêu hao..."
-                          value={quickNote}
-                          onChange={(e) => setQuickNote(e.target.value)}
-                        ></textarea>
+                      <div
+                        ref={mapRef}
+                        className="flex flex-col h-full min-h-[400px] bg-gray-100 dark:bg-gray-800 rounded-2xl overflow-hidden border-2 border-white dark:border-gray-600 shadow-lg relative group"
+                      >
+                        <div className="absolute inset-0">
+                          <AssignedMissionMapGoong
+                            latitude={request?.coordinates?.[1]}
+                            longitude={request?.coordinates?.[0]}
+                            onMapReady={setGoongMap}
+                          />
+                        </div>
+                        <div className="absolute top-4 left-4 right-4 flex justify-between items-start pointer-events-none">
+                          <div className="bg-white/90 backdrop-blur dark:bg-gray-900/90 px-3 py-2 rounded-lg shadow-md pointer-events-auto">
+                            <p className="text-xs font-bold text-gray-500 uppercase">
+                              GPS Đội cứu hộ
+                            </p>
+                            <div className="flex items-center gap-1 text-green-600 font-bold">
+                              <span className="material-symbols-outlined text-sm">
+                                my_location
+                              </span>
+                              <span>
+                                {gps.status === "ready"
+                                  ? "Đang cập nhật..."
+                                  : gps.status === "error"
+                                    ? "Không khả dụng"
+                                    : "Đang cập nhật..."}
+                              </span>
+                            </div>
+                          </div>
+                          <div
+                            className="bg-white/90 backdrop-blur dark:bg-gray-900/90 p-2 rounded-lg shadow-md pointer-events-auto cursor-pointer hover:bg-white dark:hover:bg-gray-800"
+                            role="button"
+                            tabIndex={0}
+                            onClick={handleStartNavigation}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ")
+                                handleStartNavigation();
+                            }}
+                          >
+                            <span className="material-symbols-outlined text-gray-700 dark:text-gray-300">
+                              layers
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
+                          <button
+                            type="button"
+                            disabled={!canStartNavigation}
+                            className={`w-full bg-blue-600 hover:bg-blue-500 text-white h-14 rounded-xl flex items-center justify-center gap-2 text-lg font-black shadow-xl transition-all transform active:scale-[0.98] border-2 border-blue-400/50 ${
+                              canStartNavigation
+                                ? ""
+                                : "opacity-60 cursor-not-allowed hover:bg-blue-600"
+                            }`}
+                            onClick={handleStartNavigation}
+                          >
+                            <span className="material-symbols-outlined text-3xl">
+                              turn_right
+                            </span>
+                            {startingNavigation
+                              ? "ĐANG TẢI..."
+                              : "BẮT ĐẦU DẪN ĐƯỜNG"}
+                          </button>
+                        </div>
                       </div>
                     </div>
+                  </div>
 
-                    <button
-                      type="button"
-                      className="w-full bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-200 dark:text-black text-white h-14 rounded-xl text-lg font-black shadow-xl flex items-center justify-center gap-2 transition-transform active:scale-[0.99]"
-                      onClick={handleSubmitReport}
-                      disabled={submittingReport}
-                    >
-                      <span className="material-symbols-outlined">send</span>
-                      {submittingReport ? "ĐANG GỬI..." : "GỬI BÁO CÁO & KẾT THÚC"}
-                    </button>
+                  <div className="bg-gray-50 dark:bg-gray-800/50 border-t border-gray-200 dark:border-gray-700 p-6 lg:p-8">
+                    <h3 className="text-center text-gray-400 text-xs font-bold uppercase tracking-[0.2em] mb-6">
+                      Tiến độ thực hiện
+                    </h3>
+                    <div className="mb-8">
+                      <MissionProgress
+                        missionId={mission?.id}
+                        initialStatus={mission?.status || "IN_PROGRESS"}
+                        onStatusChange={(nextStatus) => {
+                          setMission((prev) =>
+                            prev ? { ...prev, status: nextStatus } : prev,
+                          );
+                          if (nextStatus === "ARRIVED") setProgressStep(2);
+                          if (nextStatus === "COMPLETED") {
+                            setProgressStep(3);
+                            localStorage.removeItem(
+                              STORAGE_KEYS.activeRequestId,
+                            );
+                            setRouteSummary(null);
+                            setNavigationActive(false);
+                            setRequest(null);
+                            setMission(null);
+                          }
+                        }}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
             </div>
           )}
         </section>
@@ -1471,7 +1421,9 @@ const RescueTeamDashboard = () => {
         className="lg:hidden fixed bottom-6 right-6 w-16 h-16 bg-red-600 rounded-full flex items-center justify-center text-white shadow-2xl z-50 ring-4 ring-red-600/30"
         onClick={handleSOS}
       >
-        <span className="material-symbols-outlined text-4xl">emergency_share</span>
+        <span className="material-symbols-outlined text-4xl">
+          emergency_share
+        </span>
       </button>
 
       <button

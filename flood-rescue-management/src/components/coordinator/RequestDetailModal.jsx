@@ -125,8 +125,10 @@ const RequestDetailModal = ({ isOpen, onClose, request }) => {
     if (lightboxIdx === null) return;
     const handler = (e) => {
       if (e.key === "Escape") setLightboxIdx(null);
-      if (e.key === "ArrowRight") setLightboxIdx((i) => (i + 1) % medias.length);
-      if (e.key === "ArrowLeft") setLightboxIdx((i) => (i - 1 + medias.length) % medias.length);
+      if (e.key === "ArrowRight")
+        setLightboxIdx((i) => (i + 1) % medias.length);
+      if (e.key === "ArrowLeft")
+        setLightboxIdx((i) => (i - 1 + medias.length) % medias.length);
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
@@ -138,7 +140,8 @@ const RequestDetailModal = ({ isOpen, onClose, request }) => {
   // Mỗi phần tử là { id, mediaUrl, mediaType, fileSize, mimeType, createdAt }
   const medias = request.medias ?? [];
 
-  const priority = PRIORITY_CONFIG[request.priority] || PRIORITY_CONFIG["NORMAL"];
+  const priority =
+    PRIORITY_CONFIG[request.priority] || PRIORITY_CONFIG["NORMAL"];
   const status = STATUS_CONFIG[request.status] || STATUS_CONFIG["CREATED"];
   const reqType = TYPE_CONFIG[request.requestType] || TYPE_CONFIG["OTHER"];
 
@@ -157,9 +160,16 @@ const RequestDetailModal = ({ isOpen, onClose, request }) => {
           {medias.length > 1 && (
             <button
               className="absolute left-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white bg-black/30 hover:bg-black/60 rounded-full p-3 transition-all z-10"
-              onClick={(e) => { e.stopPropagation(); setLightboxIdx((lightboxIdx - 1 + medias.length) % medias.length); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setLightboxIdx(
+                  (lightboxIdx - 1 + medias.length) % medias.length,
+                );
+              }}
             >
-              <span className="material-symbols-outlined text-2xl">chevron_left</span>
+              <span className="material-symbols-outlined text-2xl">
+                chevron_left
+              </span>
             </button>
           )}
 
@@ -174,7 +184,10 @@ const RequestDetailModal = ({ isOpen, onClose, request }) => {
                 autoPlay
                 className="max-h-[80vh] max-w-full rounded-xl shadow-2xl"
               >
-                <source src={medias[lightboxIdx].mediaUrl} type={medias[lightboxIdx].mimeType} />
+                <source
+                  src={medias[lightboxIdx].mediaUrl}
+                  type={medias[lightboxIdx].mimeType}
+                />
                 Trình duyệt không hỗ trợ video.
               </video>
             ) : (
@@ -187,7 +200,9 @@ const RequestDetailModal = ({ isOpen, onClose, request }) => {
             <p className="text-white/60 text-sm mt-3">
               {lightboxIdx + 1} / {medias.length}
               {medias.length > 1 && (
-                <span className="ml-2 text-white/40">← → để chuyển, Esc để đóng</span>
+                <span className="ml-2 text-white/40">
+                  ← → để chuyển, Esc để đóng
+                </span>
               )}
             </p>
           </div>
@@ -196,9 +211,14 @@ const RequestDetailModal = ({ isOpen, onClose, request }) => {
           {medias.length > 1 && (
             <button
               className="absolute right-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white bg-black/30 hover:bg-black/60 rounded-full p-3 transition-all z-10"
-              onClick={(e) => { e.stopPropagation(); setLightboxIdx((lightboxIdx + 1) % medias.length); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setLightboxIdx((lightboxIdx + 1) % medias.length);
+              }}
             >
-              <span className="material-symbols-outlined text-2xl">chevron_right</span>
+              <span className="material-symbols-outlined text-2xl">
+                chevron_right
+              </span>
             </button>
           )}
 
@@ -216,17 +236,28 @@ const RequestDetailModal = ({ isOpen, onClose, request }) => {
               {medias.map((media, idx) => (
                 <button
                   key={media.id ?? idx}
-                  onClick={(e) => { e.stopPropagation(); setLightboxIdx(idx); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setLightboxIdx(idx);
+                  }}
                   className={`w-12 h-10 rounded-lg overflow-hidden border-2 transition-all flex-shrink-0 ${
-                    idx === lightboxIdx ? "border-white scale-110" : "border-white/30 opacity-60 hover:opacity-100"
+                    idx === lightboxIdx
+                      ? "border-white scale-110"
+                      : "border-white/30 opacity-60 hover:opacity-100"
                   }`}
                 >
                   {isVideo(media) ? (
                     <div className="w-full h-full bg-slate-700 flex items-center justify-center">
-                      <span className="material-symbols-outlined text-white text-sm">videocam</span>
+                      <span className="material-symbols-outlined text-white text-sm">
+                        videocam
+                      </span>
                     </div>
                   ) : (
-                    <img src={media.mediaUrl} alt="" className="w-full h-full object-cover" />
+                    <img
+                      src={media.mediaUrl}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
                   )}
                 </button>
               ))}
@@ -362,7 +393,9 @@ const RequestDetailModal = ({ isOpen, onClose, request }) => {
 
             {/* Có media → hiển thị grid */}
             {medias.length > 0 && (
-              <div className={`grid gap-2 ${medias.length === 1 ? "grid-cols-1" : medias.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
+              <div
+                className={`grid gap-2 ${medias.length === 1 ? "grid-cols-1" : medias.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}
+              >
                 {medias.map((media, idx) => (
                   <button
                     key={media.id ?? idx}
@@ -374,7 +407,9 @@ const RequestDetailModal = ({ isOpen, onClose, request }) => {
                     {/* Theo F3: dùng mediaType để phân loại, không check extension */}
                     {isVideo(media) ? (
                       <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800 gap-2">
-                        <span className="material-symbols-outlined text-white text-3xl">play_circle</span>
+                        <span className="material-symbols-outlined text-white text-3xl">
+                          play_circle
+                        </span>
                         <span className="text-white/70 text-[10px]">
                           {media.mimeType || "Video"}
                         </span>
@@ -392,8 +427,12 @@ const RequestDetailModal = ({ isOpen, onClose, request }) => {
                     )}
                     {/* Fallback lỗi ảnh */}
                     <div className="hidden w-full h-full absolute inset-0 flex flex-col items-center justify-center bg-slate-100 gap-1">
-                      <span className="material-symbols-outlined text-slate-400 text-2xl">broken_image</span>
-                      <span className="text-[10px] text-slate-400">Lỗi tải ảnh</span>
+                      <span className="material-symbols-outlined text-slate-400 text-2xl">
+                        broken_image
+                      </span>
+                      <span className="text-[10px] text-slate-400">
+                        Lỗi tải ảnh
+                      </span>
                     </div>
                     {/* Overlay zoom khi hover */}
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
@@ -416,7 +455,9 @@ const RequestDetailModal = ({ isOpen, onClose, request }) => {
                 <span className="material-symbols-outlined text-slate-300 text-4xl">
                   photo_library
                 </span>
-                <p className="text-sm text-slate-400 font-medium">Chưa có hình ảnh đính kèm</p>
+                <p className="text-sm text-slate-400 font-medium">
+                  Chưa có hình ảnh đính kèm
+                </p>
               </div>
             )}
           </div>
