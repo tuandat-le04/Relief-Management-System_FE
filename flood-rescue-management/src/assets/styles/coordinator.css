@@ -1,0 +1,68 @@
+/* Google Material Symbols */
+@import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200");
+
+/* Custom scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Material Icons styling */
+.material-symbols-outlined {
+  font-variation-settings:
+    "FILL" 0,
+    "wght" 400,
+    "GRAD" 0,
+    "opsz" 24;
+}
+
+/* Pulse animation for emergency markers */
+@keyframes pulse-emergency {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
+  50% { box-shadow: 0 0 0 15px rgba(220, 38, 38, 0); }
+}
+
+/* Ping animation cho ring quanh marker */
+@keyframes ping {
+  0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0.8; }
+  70% { transform: translate(-50%, -50%) scale(2.2); opacity: 0; }
+  100% { transform: translate(-50%, -50%) scale(2.2); opacity: 0; }
+}
+
+.marker-emergency { animation: pulse-emergency 2s infinite; }
+
+/* Goong Map popup custom */
+.custom-goong-popup .mapboxgl-popup-content {
+  padding: 14px 16px;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+  border: 1px solid #e2e8f0;
+  min-width: 230px;
+}
+.custom-goong-popup .mapboxgl-popup-tip {
+  border-top-color: white;
+}
+.custom-goong-popup .mapboxgl-popup-close-button {
+  font-size: 16px;
+  color: #64748b;
+  padding: 4px 8px;
+  right: 4px;
+  top: 4px;
+}
+.custom-goong-popup .mapboxgl-popup-close-button:hover {
+  color: #0f172a;
+  background: #f1f5f9;
+  border-radius: 6px;
+}
