@@ -107,16 +107,12 @@ const extractRouteCoordinates = (directionJson) => {
   if (encodedA) return decodePolyline(encodedA, 5);
 
   // Format B: overview_polyline is a plain string
-  const encodedB =
-    typeof route?.overview_polyline === "string"
-      ? route.overview_polyline
-      : null;
+  const encodedB = typeof route?.overview_polyline === "string" ? route.overview_polyline : null;
   if (encodedB) return decodePolyline(encodedB, 5);
 
   // Format C: Mapbox-style geometry as GeoJSON
   const geojsonCoords = route?.geometry?.coordinates;
-  if (Array.isArray(geojsonCoords) && geojsonCoords.length > 0)
-    return geojsonCoords;
+  if (Array.isArray(geojsonCoords) && geojsonCoords.length > 0) return geojsonCoords;
 
   // Format D: Mapbox-style geometry as polyline string
   const encodedC = typeof route?.geometry === "string" ? route.geometry : null;
@@ -1290,6 +1286,166 @@ const RescueTeamDashboard = () => {
                                   Cần cáng cứu thương
                                 </span>
                               </>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="bg-white dark:bg-[#1c1e22] border border-gray-200 dark:border-gray-700 rounded-2xl overflow-hidden">
+                          <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/30 flex items-center justify-center">
+                                <span className="material-symbols-outlined text-blue-600">assignment_turned_in</span>
+                              </div>
+                              <div>
+                                <p className="text-xs font-black uppercase tracking-widest text-gray-400">
+                                  Chi tiết nhiệm vụ
+                                </p>
+                                <p className="text-base font-black text-gray-900 dark:text-white leading-tight">
+                                  {mission?.missionType || "—"}
+                                </p>
+                              </div>
+                            </div>
+                            <span className="text-xs font-black px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 whitespace-nowrap">
+                              {mission?.missionType || "—"}
+                            </span>
+                          </div>
+
+                          <div className="p-5 space-y-6">
+                            <div>
+                              <div className="flex items-center gap-2 mb-3">
+                                <span className="material-symbols-outlined text-gray-400 text-sm">local_shipping</span>
+                                <p className="text-xs font-black uppercase tracking-widest text-gray-400">
+                                  Phương tiện (Vehicles)
+                                </p>
+                              </div>
+
+                              {mission?.vehicles?.length > 0 ? (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                  {mission.vehicles.map((v, idx) => {
+                                    const title = v?.type || "—";
+                                    const model = v?.model || "";
+                                    const license = v?.licensePlate || "—";
+                                    const capacity = Number.isFinite(Number(v?.capacityPerson))
+                                      ? `${Number(v.capacityPerson)} người`
+                                      : "—";
+                                    const status = v?.status ? String(v.status).toUpperCase() : "";
+                                    const statusCls = (() => {
+                                      if (!status) return "bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-900 dark:text-gray-200 dark:border-gray-700";
+                                      if (status === "IN_USE") {
+                                        return "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-900/30";
+                                      }
+                                      if (status === "AVAILABLE") {
+                                        return "bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-900/30";
+                                      }
+                                      if (status === "MAINTENANCE") {
+                                        return "bg-yellow-50 text-yellow-800 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-900/30";
+                                      }
+                                      return "bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-900 dark:text-gray-200 dark:border-gray-700";
+                                    })();
+
+                                    return (
+                                      <div
+                                        key={v?.missionVehicleId ?? v?.vehicleId ?? v?.licensePlate ?? idx}
+                                        className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm p-4 min-w-[200px] w-full flex flex-col gap-3"
+                                      >
+                                        <div className="flex items-start justify-between gap-3">
+                                          <p className="text-base font-black text-gray-900 dark:text-white leading-snug break-words">
+                                            {title}
+                                          </p>
+                                          {!!status && (
+                                            <span className={`text-xs font-black px-2.5 py-1 rounded-full border whitespace-nowrap ${statusCls}`}>
+                                              {status}
+                                            </span>
+                                          )}
+                                        </div>
+
+                                        <p className="text-sm font-bold text-gray-500 break-words">
+                                          {model || "—"}
+                                        </p>
+
+                                        <div className="mt-auto pt-1 flex items-center gap-2 flex-wrap">
+                                          <span className="text-xs font-black px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200">
+                                            Biển số: {license}
+                                          </span>
+                                          <span className="text-xs font-black px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200">
+                                            Sức chứa: {capacity}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              ) : (
+                                <div className="bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl p-4 flex items-center gap-3">
+                                  <span className="material-symbols-outlined text-gray-400">no_transfer</span>
+                                  <p className="text-sm font-bold text-gray-500">Chưa có phương tiện được gán.</p>
+                                </div>
+                              )}
+                            </div>
+
+                            {mission?.missionType === "RELIEF" && (
+                              <div>
+                                <div className="flex items-center gap-2 mb-3">
+                                  <span className="material-symbols-outlined text-gray-400 text-sm">inventory_2</span>
+                                  <p className="text-xs font-black uppercase tracking-widest text-gray-400">
+                                    Vật tư (Supplies)
+                                  </p>
+                                </div>
+
+                                {mission?.supplies?.length > 0 ? (
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    {mission.supplies.map((s, idx) => {
+                                      const name = s?.itemName || "—";
+                                      const type = s?.itemType || "—";
+                                      const qty = Number.isFinite(Number(s?.quantity))
+                                        ? Number(s.quantity)
+                                        : null;
+
+                                      const typeBadgeClass =
+                                        type === "FOOD"
+                                          ? "bg-green-100 text-green-700"
+                                          : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200";
+
+                                      return (
+                                        <div
+                                          key={s?.missionSupplyId ?? s?.inventoryId ?? s?.itemId ?? idx}
+                                          className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow flex flex-col gap-3 p-4"
+                                        >
+                                          <div className="flex justify-between items-start gap-3 min-w-0">
+                                            <p className="font-extrabold text-gray-800 dark:text-white text-lg truncate min-w-0">
+                                              {name}
+                                            </p>
+
+                                            <span
+                                              className={`px-2 py-1 text-[10px] font-bold rounded-md whitespace-nowrap ${typeBadgeClass}`}
+                                            >
+                                              {type}
+                                            </span>
+                                          </div>
+
+                                          <div className="mt-auto text-right">
+                                            {qty !== null ? (
+                                              <div className="inline-flex items-baseline gap-2">
+                                                <span className="text-sm text-gray-500">x</span>
+                                                <span className="text-xl font-black text-gray-800 dark:text-white">
+                                                  {qty}
+                                                </span>
+                                              </div>
+                                            ) : (
+                                              <span className="text-sm font-bold text-gray-500">—</span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                ) : (
+                                  <div className="bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl p-4 flex items-center gap-3">
+                                    <span className="material-symbols-outlined text-gray-400">inventory</span>
+                                    <p className="text-sm font-bold text-gray-500">Chưa có vật tư được gán.</p>
+                                  </div>
+                                )}
+                              </div>
                             )}
                           </div>
                         </div>

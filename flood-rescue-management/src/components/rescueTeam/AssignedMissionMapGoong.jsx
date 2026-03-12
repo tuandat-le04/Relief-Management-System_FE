@@ -38,6 +38,15 @@ export default function AssignedMissionMapGoong({ latitude, longitude, onMapRead
 
     // Expose map instance after style is ready
     const handleLoad = () => {
+      // Ensure the canvas fits the parent container (fixes blank whitespace/cropping)
+      // Delay a bit to let layout settle (fonts/panels/overlays).
+      setTimeout(() => {
+        try {
+          map.resize();
+        } catch {
+          // ignore resize failures
+        }
+      }, 300);
       onMapReady?.(map);
     };
     if (map.loaded()) {
