@@ -18,6 +18,14 @@ const STAT_ITEMS = [
     valueClass: "text-blue-700",
   },
   {
+    key: "accepted",
+    label: "Đã TN",
+    bgClass: "bg-indigo-50",
+    borderClass: "border-indigo-100",
+    labelClass: "text-indigo-600",
+    valueClass: "text-indigo-700",
+  },
+  {
     key: "inProgress",
     label: "Đang XL",
     bgClass: "bg-green-50",
@@ -37,7 +45,7 @@ const STAT_ITEMS = [
 
 const StatsCards = ({ stats }) => {
   return (
-    <div className="p-3 grid grid-cols-4 gap-2 border-b border-slate-200">
+    <div className="p-3 grid grid-cols-5 gap-2 border-b border-slate-200">
       {STAT_ITEMS.map((item) => (
         <div
           key={item.key}

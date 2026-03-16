@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
 import rescueTeamService from "../../services/rescueTeamService";
-import vehicleService from "../../services/vehicleService";
 import missionService from "../../services/missionService";
 
 // ─── Icon theo loại xe ───────────────────────────────────────────────────────
@@ -15,24 +14,31 @@ const getVehicleIcon = (type) => {
   return "directions_car";
 };
 
-// ─── Helper: lấy rescueTeamId từ mission object (thử nhiều field khác nhau) ───
-const extractTeamIdFromMission = (mission) => {
-  // Thử các field name backend có thể trả về
-  return (
-    mission.rescueTeamId ??
-    mission.teamId ??
-    mission.team?.id ??
-    mission.teamAssignment?.rescueTeamId ??
-    mission.assignedTeamId ??
-    null
-  );
-};
+const mapVehicleFromMission = (
+  vehicle,
+  rescueTeamId,
+  rescueTeamName,
+  missionId,
+) => ({
+  id: vehicle.missionVehicleId ?? vehicle.vehicleId,
+  missionVehicleId: vehicle.missionVehicleId ?? null,
+  vehicleId: vehicle.vehicleId,
+  licensePlate: vehicle.licensePlate || "",
+  code: vehicle.licensePlate || `VH-${vehicle.vehicleId}`,
+  model: vehicle.model || "",
+  type: vehicle.type || "",
+  typeRaw: vehicle.type || "",
+  capacityPerson: vehicle.capacityPerson ?? 0,
+  statusRaw: vehicle.status || "IN_USE",
+  currentMissionId: missionId,
+  currentTeamId: rescueTeamId,
+  currentTeamName: rescueTeamName || null,
+});
 
 // ─── TeamStatusPanel ──────────────────────────────────────────────────────────
 const TeamStatusPanel = ({ isOpen, onClose }) => {
   const [teams, setTeams] = useState([]);
   const [inUseVehicles, setInUseVehicles] = useState([]);
-  const [missions, setMissions] = useState([]);
   // Map: teamId → mission (được build sau khi load xong)
   const [teamMissionMap, setTeamMissionMap] = useState({});
   const [loading, setLoading] = useState(false);
@@ -41,46 +47,51 @@ const TeamStatusPanel = ({ isOpen, onClose }) => {
   // ── Load data ──────────────────────────────────────────────────────────────
   const loadData = useCallback(async () => {
     setLoading(true);
-    const [teamsResult, vehiclesResult, missionsResult] = await Promise.all([
+    const [teamsResult, activeTeamsResult] = await Promise.all([
       rescueTeamService.getAllTeams(),
-      vehicleService.getVehiclesByStatus("IN_USE"),
-      missionService.getAllMissions(),
+      missionService.getActiveTeamMissions(),
     ]);
 
-    const rawTeams   = teamsResult.success    ? teamsResult.data    : [];
-    const rawVehicles = vehiclesResult.success ? vehiclesResult.data : [];
-    const rawMissions = missionsResult.success ? missionsResult.data : [];
+    const activeRows = activeTeamsResult.success ? activeTeamsResult.data : [];
 
-    // ── Xây dựng teamMissionMap bằng 2 chiến lược ─────────────────────────
+    // map team -> mission từ endpoint /missions/active-teams
     const map = {};
 
-    // Chiến lược 1: qua vehicle.currentTeamId + vehicle.currentMissionId (api2.md)
-    rawVehicles.forEach((v) => {
-      const tid = v.currentTeamId;
-      const mid = v.currentMissionId;
-      if (tid && mid && !map[tid]) {
-        const mission = rawMissions.find((m) => m.id === mid);
-        if (mission) {
-          map[tid] = mission;
-        }
+    activeRows.forEach((row) => {
+      if (row?.rescueTeamId && row?.mission?.id) {
+        map[row.rescueTeamId] = row.mission;
       }
     });
 
-    // Chiến lược 2: đọc trực tiếp rescueTeamId (hoặc field tương đương) từ mission
-    rawMissions.forEach((m) => {
-      const tid = extractTeamIdFromMission(m);
-      if (tid && !map[tid]) {
-        // Chỉ lấy mission đang active
-        const activeStatuses = ["ASSIGNED", "IN_PROGRESS", "ARRIVED"];
-        if (activeStatuses.includes(m.status)) {
-          map[tid] = m;
-        }
-      }
+    // phẳng hoá vehicles từ mission để tái sử dụng UI hiện có
+    const flattenedVehicles = activeRows.flatMap((row) => {
+      const list = Array.isArray(row?.mission?.vehicles)
+        ? row.mission.vehicles
+        : [];
+      return list.map((vehicle) =>
+        mapVehicleFromMission(
+          vehicle,
+          row.rescueTeamId,
+          row.rescueTeamName,
+          row.mission?.id,
+        ),
+      );
     });
+
+    const fallbackTeams = activeRows.map((row) => ({
+      id: row.rescueTeamId,
+      name: row.rescueTeamName || `Đội #${row.rescueTeamId}`,
+      status: row.rescueTeamStatus || "BUSY",
+      quantity: row.rescueTeamSize,
+    }));
+
+    const rawTeams =
+      teamsResult.success && Array.isArray(teamsResult.data)
+        ? teamsResult.data
+        : fallbackTeams;
 
     setTeams(rawTeams);
-    setInUseVehicles(rawVehicles);
-    setMissions(rawMissions);
+    setInUseVehicles(flattenedVehicles);
     setTeamMissionMap(map);
     setLastUpdated(new Date());
     setLoading(false);
@@ -108,23 +119,8 @@ const TeamStatusPanel = ({ isOpen, onClose }) => {
 
   const getMissionForTeam = (teamId) => teamMissionMap[teamId] ?? null;
 
-  // ── Kiểm tra backend có trả currentTeamId không ──────────────────────────
-  const backendSupportsTeamId = inUseVehicles.some((v) => v.currentTeamId != null);
-
-  // ── Xây dựng danh sách "nhiệm vụ đang chạy" từ vehicle → mission ─────────
-  // (luôn hoạt động vì vehicle có currentMissionId)
-  const activeMissionCards = inUseVehicles.reduce((acc, vehicle) => {
-    const missionId = vehicle.currentMissionId;
-    if (!missionId) return acc;
-    if (acc.find((c) => c.missionId === missionId)) {
-      // Cùng mission → gộp xe vào
-      acc.find((c) => c.missionId === missionId).vehicles.push(vehicle);
-    } else {
-      const mission = missions.find((m) => m.id === missionId) || null;
-      acc.push({ missionId, mission, vehicles: [vehicle] });
-    }
-    return acc;
-  }, []);
+  // Dữ liệu từ /missions/active-teams đã có mapping team ↔ mission rõ ràng
+  const hasAssignmentContext = true;
 
   // Chia nhóm teams
   const busyTeams = teams.filter((t) => t.status === "BUSY");
@@ -232,38 +228,28 @@ const TeamStatusPanel = ({ isOpen, onClose }) => {
             </div>
           ) : (
             <div className="p-4 space-y-5">
-
               {/* ── Cảnh báo backend thiếu currentTeamId ── */}
-              {!backendSupportsTeamId && inUseVehicles.length > 0 && (
+              {!hasAssignmentContext && inUseVehicles.length > 0 && (
                 <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-3 flex items-start gap-2.5">
-                  <span className="material-symbols-outlined text-amber-500 text-base flex-shrink-0 mt-0.5">info</span>
+                  <span className="material-symbols-outlined text-amber-500 text-base flex-shrink-0 mt-0.5">
+                    info
+                  </span>
                   <div>
-                    <p className="text-xs font-bold text-amber-800">Backend chưa trả về liên kết Team ↔ Xe</p>
+                    <p className="text-xs font-bold text-amber-800">
+                      Backend chưa trả về liên kết Team ↔ Xe
+                    </p>
                     <p className="text-[10px] text-amber-700 mt-0.5 leading-relaxed">
-                      Field <code className="bg-amber-100 px-1 rounded">currentTeamId</code> trên vehicle đang là <code className="bg-amber-100 px-1 rounded">null</code>.
-                      Đội BUSY và nhiệm vụ hiển thị tách biệt đến khi backend cập nhật.
+                      Field{" "}
+                      <code className="bg-amber-100 px-1 rounded">
+                        currentTeamId
+                      </code>{" "}
+                      trên vehicle đang là{" "}
+                      <code className="bg-amber-100 px-1 rounded">null</code>.
+                      Đội BUSY và nhiệm vụ hiển thị tách biệt đến khi backend
+                      cập nhật.
                     </p>
                   </div>
                 </div>
-              )}
-
-              {/* ── Section: Nhiệm vụ & xe đang hoạt động (luôn hiển thị nếu có) ── */}
-              {activeMissionCards.length > 0 && (
-                <Section
-                  title="Nhiệm vụ đang thực hiện"
-                  count={activeMissionCards.length}
-                  color="orange"
-                  emptyText=""
-                >
-                  {activeMissionCards.map(({ missionId, mission, vehicles }) => (
-                    <ActiveMissionCard
-                      key={missionId}
-                      missionId={missionId}
-                      mission={mission}
-                      vehicles={vehicles}
-                    />
-                  ))}
-                </Section>
               )}
 
               {/* ── Section: Đội đang bận ── */}
@@ -284,7 +270,7 @@ const TeamStatusPanel = ({ isOpen, onClose }) => {
                       vehicles={teamVehicles}
                       mission={mission}
                       variant="busy"
-                      backendSupportsTeamId={backendSupportsTeamId}
+                      hasAssignmentContext={hasAssignmentContext}
                     />
                   );
                 })}
@@ -299,7 +285,14 @@ const TeamStatusPanel = ({ isOpen, onClose }) => {
                 emptyIcon="group_off"
               >
                 {activeTeams.map((team) => (
-                  <TeamCard key={team.id} team={team} vehicles={[]} mission={null} variant="active" backendSupportsTeamId={backendSupportsTeamId} />
+                  <TeamCard
+                    key={team.id}
+                    team={team}
+                    vehicles={[]}
+                    mission={null}
+                    variant="active"
+                    hasAssignmentContext={hasAssignmentContext}
+                  />
                 ))}
               </Section>
 
@@ -312,11 +305,17 @@ const TeamStatusPanel = ({ isOpen, onClose }) => {
                   emptyText=""
                 >
                   {inactiveTeams.map((team) => (
-                    <TeamCard key={team.id} team={team} vehicles={[]} mission={null} variant="inactive" backendSupportsTeamId={backendSupportsTeamId} />
+                    <TeamCard
+                      key={team.id}
+                      team={team}
+                      vehicles={[]}
+                      mission={null}
+                      variant="inactive"
+                      hasAssignmentContext={hasAssignmentContext}
+                    />
                   ))}
                 </Section>
               )}
-
             </div>
           )}
         </div>
@@ -331,7 +330,9 @@ const TeamStatusPanel = ({ isOpen, onClose }) => {
             disabled={loading}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50"
           >
-            <span className={`material-symbols-outlined text-sm ${loading ? "animate-spin" : ""}`}>
+            <span
+              className={`material-symbols-outlined text-sm ${loading ? "animate-spin" : ""}`}
+            >
               refresh
             </span>
             Làm mới
@@ -342,60 +343,14 @@ const TeamStatusPanel = ({ isOpen, onClose }) => {
   );
 };
 
-// ─── ActiveMissionCard — hiển thị mission + xe (không cần team link) ─────────
-const ActiveMissionCard = ({ missionId, mission, vehicles }) => (
-  <div className="border border-orange-200 bg-orange-50/30 rounded-xl overflow-hidden">
-    {/* Mission header */}
-    <div className="bg-orange-50 px-3 py-2.5 border-b border-orange-200 flex items-center gap-2.5">
-      <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
-        <span className="material-symbols-outlined text-orange-600 text-base">military_tech</span>
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <p className="font-bold text-sm text-slate-800">Nhiệm vụ #{missionId}</p>
-          {mission?.missionType && (
-            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">
-              {mission.missionType === "RESCUE" ? "Cứu hộ" : mission.missionType === "RELIEF" ? "Cứu trợ" : mission.missionType}
-            </span>
-          )}
-          {mission?.status && <MissionStatusBadge status={mission.status} />}
-        </div>
-        {mission?.requestId && (
-          <p className="text-[10px] text-slate-500 mt-0.5">Yêu cầu #{mission.requestId}</p>
-        )}
-      </div>
-    </div>
-
-    {/* Vehicles */}
-    <div className="px-3 py-2.5 space-y-1.5">
-      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-        {vehicles.length} phương tiện đang thực hiện
-      </p>
-      {vehicles.map((v) => (
-        <div key={v.id} className="flex items-center gap-2.5 bg-white rounded-lg border border-purple-200 px-2.5 py-2">
-          <span className="material-symbols-outlined text-purple-500 text-base flex-shrink-0">
-            {getVehicleIcon(v.typeRaw || v.type)}
-          </span>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-bold text-slate-800 truncate">
-              {v.licensePlate || v.code}
-              {v.model && <span className="font-normal text-slate-500 ml-1">— {v.model}</span>}
-            </p>
-            <p className="text-[10px] text-slate-500">
-              {v.typeRaw || v.type} · {v.capacityPerson} người
-            </p>
-          </div>
-          <span className="flex-shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700">
-            Đang dùng
-          </span>
-        </div>
-      ))}
-    </div>
-  </div>
-);
-
 // ─── TeamCard ─────────────────────────────────────────────────────────────────
-const TeamCard = ({ team, vehicles, mission, variant, backendSupportsTeamId }) => {
+const TeamCard = ({
+  team,
+  vehicles,
+  mission,
+  variant,
+  hasAssignmentContext,
+}) => {
   const variantConfig = {
     busy: {
       border: "border-red-200",
@@ -429,19 +384,31 @@ const TeamCard = ({ team, vehicles, mission, variant, backendSupportsTeamId }) =
   const cfg = variantConfig[variant] || variantConfig.inactive;
 
   return (
-    <div className={`border ${cfg.border} ${cfg.bg} rounded-xl overflow-hidden`}>
+    <div
+      className={`border ${cfg.border} ${cfg.bg} rounded-xl overflow-hidden`}
+    >
       {/* Team header */}
-      <div className={`${cfg.headerBg} px-3 py-2.5 flex items-center gap-2.5 border-b ${cfg.border}`}>
+      <div
+        className={`${cfg.headerBg} px-3 py-2.5 flex items-center gap-2.5 border-b ${cfg.border}`}
+      >
         <div className="relative flex-shrink-0">
           <div className="w-8 h-8 bg-white rounded-lg shadow-sm flex items-center justify-center border border-slate-200">
-            <span className="material-symbols-outlined text-slate-600 text-base">groups</span>
+            <span className="material-symbols-outlined text-slate-600 text-base">
+              groups
+            </span>
           </div>
-          <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 ${cfg.dot} ${cfg.dotAnim} rounded-full border-2 border-white`} />
+          <span
+            className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 ${cfg.dot} ${cfg.dotAnim} rounded-full border-2 border-white`}
+          />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <p className="font-bold text-sm text-slate-800 truncate">{team.name}</p>
-            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 ${cfg.badge}`}>
+            <p className="font-bold text-sm text-slate-800 truncate">
+              {team.name}
+            </p>
+            <span
+              className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 ${cfg.badge}`}
+            >
               {cfg.badgeLabel}
             </span>
           </div>
@@ -454,54 +421,81 @@ const TeamCard = ({ team, vehicles, mission, variant, backendSupportsTeamId }) =
       {/* Mission info — chỉ khi backend đã hỗ trợ currentTeamId */}
       {variant === "busy" && (
         <div className="px-3 py-2.5 space-y-2">
-          {backendSupportsTeamId ? (
+          {hasAssignmentContext ? (
             <>
               {/* Mission chip */}
               {mission ? (
                 <div className="flex items-center gap-2 bg-white rounded-lg border border-slate-200 px-2.5 py-2">
-                  <span className="material-symbols-outlined text-blue-500 text-sm flex-shrink-0">military_tech</span>
+                  <span className="material-symbols-outlined text-blue-500 text-sm flex-shrink-0">
+                    military_tech
+                  </span>
                   <div className="min-w-0">
-                    <p className="text-xs font-bold text-slate-800">Nhiệm vụ #{mission.id}</p>
+                    <p className="text-xs font-bold text-slate-800">
+                      Nhiệm vụ #{mission.id}
+                    </p>
                     <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                      <span className="text-[10px] text-slate-500">Yêu cầu #{mission.requestId ?? "—"}</span>
+                      <span className="text-[10px] text-slate-500">
+                        Yêu cầu #{mission.requestId ?? "—"}
+                      </span>
                       {mission.missionType && (
                         <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">
-                          {mission.missionType === "RESCUE" ? "Cứu hộ" : mission.missionType === "RELIEF" ? "Cứu trợ" : mission.missionType}
+                          {mission.missionType === "RESCUE"
+                            ? "Cứu hộ"
+                            : mission.missionType === "RELIEF"
+                              ? "Cứu trợ"
+                              : mission.missionType}
                         </span>
                       )}
-                      {mission.status && <MissionStatusBadge status={mission.status} />}
+                      {mission.status && (
+                        <MissionStatusBadge status={mission.status} />
+                      )}
                     </div>
                   </div>
                 </div>
               ) : (
                 <div className="flex items-center gap-2 bg-slate-50 rounded-lg border border-slate-200 px-2.5 py-2">
-                  <span className="material-symbols-outlined text-slate-400 text-sm">pending</span>
-                  <p className="text-xs text-slate-500">Chưa tìm được nhiệm vụ</p>
+                  <span className="material-symbols-outlined text-slate-400 text-sm">
+                    pending
+                  </span>
+                  <p className="text-xs text-slate-500">
+                    Chưa tìm được nhiệm vụ
+                  </p>
                 </div>
               )}
 
               {/* Vehicles */}
               {vehicles.length > 0 ? (
                 <div className="space-y-1.5">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-0.5">Phương tiện</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-0.5">
+                    Phương tiện
+                  </p>
                   {vehicles.map((v) => (
                     <VehicleRow key={v.id} vehicle={v} />
                   ))}
                 </div>
               ) : (
                 <div className="flex items-center gap-2 bg-slate-50 rounded-lg border border-slate-200 px-2.5 py-2">
-                  <span className="material-symbols-outlined text-slate-400 text-sm">no_transfer</span>
-                  <p className="text-xs text-slate-500">Chưa có phương tiện được gán</p>
+                  <span className="material-symbols-outlined text-slate-400 text-sm">
+                    no_transfer
+                  </span>
+                  <p className="text-xs text-slate-500">
+                    Chưa có phương tiện được gán
+                  </p>
                 </div>
               )}
             </>
           ) : (
             /* Khi backend chưa hỗ trợ currentTeamId — hiện gợi ý xem section bên trên */
             <div className="flex items-center gap-2 bg-slate-50 rounded-lg border border-slate-200 px-2.5 py-2">
-              <span className="material-symbols-outlined text-slate-400 text-sm">info</span>
+              <span className="material-symbols-outlined text-slate-400 text-sm">
+                info
+              </span>
               <p className="text-xs text-slate-500">
                 Xem chi tiết nhiệm vụ tại mục{" "}
-                <span className="font-semibold text-orange-600">Nhiệm vụ đang thực hiện</span> bên trên
+                <span className="font-semibold text-orange-600">
+                  Nhiệm vụ đang thực hiện
+                </span>{" "}
+                bên trên
               </p>
             </div>
           )}
@@ -511,21 +505,56 @@ const TeamCard = ({ team, vehicles, mission, variant, backendSupportsTeamId }) =
       {/* Available team */}
       {variant === "active" && (
         <div className="px-3 py-2 flex items-center gap-2">
-          <span className="material-symbols-outlined text-emerald-400 text-sm">check_circle</span>
-          <p className="text-xs text-slate-500">Đội đang chờ nhận nhiệm vụ mới</p>
+          <span className="material-symbols-outlined text-emerald-400 text-sm">
+            check_circle
+          </span>
+          <p className="text-xs text-slate-500">
+            Đội đang chờ nhận nhiệm vụ mới
+          </p>
         </div>
       )}
 
       {/* Inactive team */}
       {variant === "inactive" && (
         <div className="px-3 py-2 flex items-center gap-2">
-          <span className="material-symbols-outlined text-slate-400 text-sm">pause_circle</span>
+          <span className="material-symbols-outlined text-slate-400 text-sm">
+            pause_circle
+          </span>
           <p className="text-xs text-slate-400">Đội tạm ngưng hoạt động</p>
         </div>
       )}
     </div>
   );
 };
+
+const VehicleRow = ({ vehicle }) => (
+  <div className="flex items-center gap-2.5 bg-white rounded-lg border border-purple-200 px-2.5 py-2">
+    <span className="material-symbols-outlined text-purple-500 text-base flex-shrink-0">
+      {getVehicleIcon(vehicle.typeRaw || vehicle.type)}
+    </span>
+    <div className="flex-1 min-w-0">
+      <p className="text-xs font-bold text-slate-800 truncate">
+        {vehicle.licensePlate ||
+          vehicle.code ||
+          `Xe #${vehicle.vehicleId ?? vehicle.id}`}
+        {vehicle.model && (
+          <span className="font-normal text-slate-500 ml-1">
+            — {vehicle.model}
+          </span>
+        )}
+      </p>
+      <p className="text-[10px] text-slate-500">
+        {vehicle.typeRaw || vehicle.type || "Phương tiện"}
+        {typeof vehicle.capacityPerson === "number"
+          ? ` · ${vehicle.capacityPerson} người`
+          : ""}
+      </p>
+    </div>
+    <span className="flex-shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700">
+      Đang dùng
+    </span>
+  </div>
+);
 
 // ─── Section wrapper ─────────────────────────────────────────────────────────
 const Section = ({ title, count, color, children, emptyText, emptyIcon }) => {
@@ -551,10 +580,14 @@ const Section = ({ title, count, color, children, emptyText, emptyIcon }) => {
         <span className="text-xs font-bold text-slate-600 uppercase tracking-wider flex-1 text-left group-hover:text-slate-800 transition-colors">
           {title}
         </span>
-        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${cfg.badge}`}>
+        <span
+          className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${cfg.badge}`}
+        >
           {count}
         </span>
-        <span className={`material-symbols-outlined text-slate-400 text-sm transition-transform ${collapsed ? "-rotate-90" : ""}`}>
+        <span
+          className={`material-symbols-outlined text-slate-400 text-sm transition-transform ${collapsed ? "-rotate-90" : ""}`}
+        >
           expand_more
         </span>
       </button>
@@ -566,7 +599,9 @@ const Section = ({ title, count, color, children, emptyText, emptyIcon }) => {
           ) : (
             <div className="flex flex-col items-center justify-center py-5 gap-2 text-slate-300">
               {emptyIcon && (
-                <span className="material-symbols-outlined text-3xl">{emptyIcon}</span>
+                <span className="material-symbols-outlined text-3xl">
+                  {emptyIcon}
+                </span>
               )}
               <p className="text-xs text-center">{emptyText}</p>
             </div>
@@ -585,7 +620,9 @@ const SummaryBadge = ({ count, label, color, icon }) => {
     orange: "bg-orange-500/20 text-orange-200",
   };
   return (
-    <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg ${colorMap[color]}`}>
+    <div
+      className={`flex items-center gap-1.5 px-2 py-1 rounded-lg ${colorMap[color]}`}
+    >
       <span className="material-symbols-outlined text-sm">{icon}</span>
       <span className="text-xs font-bold">{count}</span>
       <span className="text-xs hidden sm:inline">{label}</span>
@@ -612,7 +649,9 @@ const MissionStatusBadge = ({ status }) => {
   };
   const cls = map[status] || "bg-slate-100 text-slate-500";
   return (
-    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${cls}`}>
+    <span
+      className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${cls}`}
+    >
       {labelMap[status] || status}
     </span>
   );

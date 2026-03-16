@@ -6,7 +6,11 @@ const GOONG_MAPTILES_KEY = import.meta.env.VITE_GOONG_MAPTILES_KEY;
 
 const isFiniteNumber = (value) => Number.isFinite(Number(value));
 
-export default function AssignedMissionMapGoong({ latitude, longitude, onMapReady }) {
+export default function AssignedMissionMapGoong({
+  latitude,
+  longitude,
+  onMapReady,
+}) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const markerRef = useRef(null);
@@ -38,6 +42,15 @@ export default function AssignedMissionMapGoong({ latitude, longitude, onMapRead
 
     // Expose map instance after style is ready
     const handleLoad = () => {
+      // Ensure the canvas fits the parent container (fixes blank whitespace/cropping)
+      // Delay a bit to let layout settle (fonts/panels/overlays).
+      setTimeout(() => {
+        try {
+          map.resize();
+        } catch {
+          // ignore resize failures
+        }
+      }, 300);
       onMapReady?.(map);
     };
     if (map.loaded()) {
