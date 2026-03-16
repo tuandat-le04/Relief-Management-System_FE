@@ -39,6 +39,11 @@ const getVehicleIcon = (type) => {
 };
 
 // ─── Component chính ─────────────────────────────────────────────────────────
+// Luồng xử lý chính:
+// 1) Chọn đội cứu hộ (bắt buộc)
+// 2) Gán phương tiện (tùy chọn)
+// 3) Gán vật tư (tùy chọn)
+// Khi submit sẽ chạy tuần tự để dễ khoanh vùng lỗi theo từng bước nghiệp vụ.
 const AssignMissionModal = ({ isOpen, onClose, request, onSuccess }) => {
   // ── Mission ──
   const [mission, setMission] = useState(null);
@@ -353,6 +358,7 @@ const AssignMissionModal = ({ isOpen, onClose, request, onSuccess }) => {
   };
 
   // ─── Submit tổng — gọi tuần tự team → vehicle → supplies ────────────────
+  // Mục tiêu: nếu bước nào fail thì dừng ngay, user biết chính xác lỗi ở đâu.
   const handleSubmit = async () => {
     if (!selectedTeam) {
       setTeamError("Vui lòng chọn đội cứu hộ trước khi xác nhận");

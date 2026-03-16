@@ -82,17 +82,11 @@ const rescueRequestService = {
     try {
       const response = await api.get("/rescue-requests");
 
-      console.log("=== DEBUG API RESPONSE ===");
-      console.log("Response.data:", response.data);
-      console.log("========================");
-
       // Response format: {success: true, message: "...", data: [...]}
       if (response.data?.success && Array.isArray(response.data?.data)) {
         const transformedData = response.data.data
           .map(transformRescueRequest)
           .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); // Sort mới nhất đến cũ nhất
-
-        console.log("✅ Transformed Data:", transformedData);
 
         return {
           success: true,
@@ -105,7 +99,6 @@ const rescueRequestService = {
         response.data?.success &&
         (response.data?.data === null || response.data?.data?.length === 0)
       ) {
-        console.log("⚠️ No data available");
         return {
           success: true,
           data: [],
@@ -360,13 +353,6 @@ const rescueRequestService = {
     try {
       const response = await api.put(`/rescue-requests/${requestId}/approve`);
 
-      console.log("=== APPROVE API RESPONSE ===");
-      console.log("Full response:", response);
-      console.log("Response.data:", response.data);
-      console.log("Response.data.data:", response.data?.data);
-      console.log("Status in response:", response.data?.data?.status);
-      console.log("===========================");
-
       if (response.data?.success) {
         return {
           success: true,
@@ -395,8 +381,6 @@ const rescueRequestService = {
   cancelRequest: async (requestId, reason = "") => {
     try {
       const response = await api.put(`/rescue-requests/${requestId}/cancel`);
-
-      console.log("Cancel response:", response.data);
 
       if (response.data?.success) {
         return {
