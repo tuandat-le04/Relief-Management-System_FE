@@ -253,6 +253,11 @@ const AssignMissionModal = ({ isOpen, onClose, request, onSuccess }) => {
     });
     setLoadingAssignTeam(false);
     if (result.success) {
+      const refreshedMission = await missionService.getMissionById(missionId);
+      if (refreshedMission.success && refreshedMission.data) {
+        setMission(refreshedMission.data);
+      }
+
       setTeamAssigned(true);
       return true;
     } else {

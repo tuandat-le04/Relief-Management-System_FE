@@ -10,6 +10,14 @@ const TAB_CONFIG = [
     getCount: (stats) => stats.rescue + stats.relief,
   },
   {
+    key: "accepted",
+    label: "Đã tiếp nhận",
+    icon: "fact_check",
+    activeClass: "bg-white text-indigo-600 shadow-sm",
+    badgeClass: "bg-indigo-600",
+    getCount: (stats) => stats.accepted,
+  },
+  {
     key: "inprogress",
     label: "Đang xử lý",
     icon: "autorenew",
@@ -38,7 +46,7 @@ const TAB_CONFIG = [
 const TabBar = ({ activeTab, setActiveTab, setActiveFilter, stats }) => {
   return (
     <div className="p-3 border-b border-slate-200">
-      <div className="grid grid-cols-4 gap-1 bg-slate-100 rounded-lg p-1">
+      <div className="grid grid-cols-5 gap-1 bg-slate-100 rounded-lg p-1">
         {TAB_CONFIG.map((tab) => {
           const count = tab.getCount(stats);
           return (

@@ -1,6 +1,41 @@
 import api from "./api";
 
+const extractMissionRequestId = (mission) =>
+  mission?.requestId ?? mission?.requestID ?? mission?.request?.id ?? null;
+
+const isTerminalMissionStatus = (status) =>
+  status === "COMPLETED" || status === "CANCELLED";
+
 const missionService = {
+  // ── GET /api/v1/missions/active-teams ────────────────────────────────────
+  // API chính cho màn theo dõi coordinator: team + mission + vehicles + supplies
+  getActiveTeamMissions: async () => {
+    try {
+      const response = await api.get("/missions/active-teams");
+      if (response.data?.success) {
+        const list = Array.isArray(response.data?.data)
+          ? response.data.data
+          : [];
+        return { success: true, data: list };
+      }
+      return {
+        success: false,
+        error:
+          response.data?.message ||
+          "Không thể tải danh sách đội đang hoạt động",
+      };
+    } catch (error) {
+      console.error("Error fetching active team missions:", error);
+      return {
+        success: false,
+        error:
+          error.response?.data?.message ||
+          error.message ||
+          "Không thể tải danh sách đội đang hoạt động",
+      };
+    }
+  },
+
   // ── GET /api/v1/missions ─────────────────────────────────────────────────
   // Lấy toàn bộ nhiệm vụ (dành cho Coordinator/Admin)
   getAllMissions: async () => {
@@ -113,9 +148,12 @@ const missionService = {
     try {
       const response = await api.get("/missions/assigned-to-me");
       if (response.data?.success) {
-        const list = Array.isArray(response.data?.data)
-          ? response.data.data
-          : [];
+        const payload = response.data?.data;
+        const list = Array.isArray(payload)
+          ? payload
+          : payload
+            ? [payload]
+            : [];
         return { success: true, data: list };
       }
       return {
@@ -137,14 +175,52 @@ const missionService = {
   // Lấy mission theo requestId
   getMissionByRequestId: async (requestId) => {
     try {
+      const targetRequestId = Number(requestId);
+
+      // Một số backend có thể bỏ qua query `requestId`, nên luôn filter lại ở FE.
+      // Ưu tiên gọi endpoint query trước để giảm payload.
       const response = await api.get(`/missions?requestId=${requestId}`);
+
       if (response.data?.success) {
-        const missions = response.data.data;
-        // Lấy mission MỚI NHẤT (id lớn nhất) thay vì missions[0] (cũ nhất)
-        const mission = Array.isArray(missions)
-          ? [...missions].sort((a, b) => b.id - a.id)[0]
-          : missions;
-        return { success: true, data: mission || null };
+        let missions = Array.isArray(response.data?.data)
+          ? response.data.data
+          : response.data?.data
+            ? [response.data.data]
+            : [];
+
+        missions = missions.filter((m) => {
+          const mReqId = Number(extractMissionRequestId(m));
+          return Number.isFinite(targetRequestId)
+            ? mReqId === targetRequestId
+            : String(extractMissionRequestId(m)) === String(requestId);
+        });
+
+        if (missions.length === 0) {
+          const allRes = await missionService.getAllMissions();
+          if (allRes.success) {
+            missions = allRes.data.filter((m) => {
+              const mReqId = Number(extractMissionRequestId(m));
+              return Number.isFinite(targetRequestId)
+                ? mReqId === targetRequestId
+                : String(extractMissionRequestId(m)) === String(requestId);
+            });
+          }
+        }
+
+        // Ưu tiên mission chưa kết thúc, sau đó chọn mission mới nhất.
+        const sorted = [...missions].sort((a, b) => {
+          const aTime = new Date(a?.updatedAt || a?.createdAt || 0).getTime();
+          const bTime = new Date(b?.updatedAt || b?.createdAt || 0).getTime();
+          if (aTime !== bTime) return bTime - aTime;
+          return (b?.id || 0) - (a?.id || 0);
+        });
+
+        const mission =
+          sorted.find((m) => !isTerminalMissionStatus(m?.status)) ||
+          sorted[0] ||
+          null;
+
+        return { success: true, data: mission };
       }
       return { success: false, error: "Không tìm thấy nhiệm vụ" };
     } catch (error) {

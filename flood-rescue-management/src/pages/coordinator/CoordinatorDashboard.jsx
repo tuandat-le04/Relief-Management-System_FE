@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Header from "../../components/coordinator/Header";
 import TabBar from "../../components/coordinator/TabBar";
 import StatsCards from "../../components/coordinator/StatsCards";
@@ -13,6 +13,87 @@ import AssignMissionModal from "../../components/coordinator/AssignMissionModal"
 import useMap from "../../hooks/useMap";
 import "../../assets/styles/coordinator.css";
 import rescueRequestService from "../../services/rescueRequestService";
+import missionService from "../../services/missionService";
+
+const getMissionRequestId = (mission) =>
+  mission?.requestId ?? mission?.requestID ?? mission?.request?.id ?? null;
+
+const getMissionUpdatedTime = (mission) => {
+  const raw =
+    mission?.updatedAt ??
+    mission?.endTime ??
+    mission?.startTime ??
+    mission?.createdAt;
+  if (!raw) return 0;
+  const time = new Date(raw).getTime();
+  return Number.isFinite(time) ? time : 0;
+};
+
+const buildLatestMissionMap = (missions) => {
+  const map = {};
+  (Array.isArray(missions) ? missions : []).forEach((mission) => {
+    const requestId = getMissionRequestId(mission);
+    if (!requestId) return;
+    const key = String(requestId);
+    const prev = map[key];
+    const missionId = mission?.id ?? 0;
+    const prevId = prev?.id ?? 0;
+    const missionTime = getMissionUpdatedTime(mission);
+    const prevTime = getMissionUpdatedTime(prev);
+    if (
+      !prev ||
+      missionTime > prevTime ||
+      (missionTime === prevTime && missionId > prevId)
+    ) {
+      map[key] = mission;
+    }
+  });
+  return map;
+};
+
+const buildActiveRequestIdSet = (activeRows) => {
+  const set = new Set();
+  (Array.isArray(activeRows) ? activeRows : []).forEach((row) => {
+    const requestId =
+      row?.request?.id ??
+      row?.mission?.requestId ??
+      row?.mission?.requestID ??
+      null;
+    if (requestId !== null && requestId !== undefined) {
+      set.add(String(requestId));
+    }
+  });
+  return set;
+};
+
+const getRequestStage = (request, mission, isActiveTeamAssigned = false) => {
+  if (!request) return "pending";
+  if (request.status === "CANCELLED") return "cancelled";
+  if (request.status === "COMPLETED") return "completed";
+
+  // Ưu tiên mission status khi đã có mission để tránh lệch trạng thái
+  // (ví dụ request.status còn PENDING nhưng mission đã ARRIVED/IN_PROGRESS)
+  const missionStatus = mission?.status;
+  if (missionStatus === "COMPLETED") return "inprogress";
+  if (missionStatus === "IN_PROGRESS" || missionStatus === "ARRIVED") {
+    return "inprogress";
+  }
+  if (missionStatus === "ASSIGNED") {
+    return "accepted";
+  }
+
+  if (request.status === "PENDING") return "pending";
+
+  if (request.status === "IN_PROGRESS") {
+    // Chỉ sang "Đang xử lý" khi team thực sự đã active trên mission.
+    // Tránh case backend auto tạo mission ngay sau approve làm nhảy tab sớm.
+    if (isActiveTeamAssigned) return "inprogress";
+
+    return "accepted";
+  }
+
+  return "pending";
+};
 
 const CoordinatorDashboard = () => {
   const [activeTab, setActiveTab] = useState("pending");
@@ -21,6 +102,8 @@ const CoordinatorDashboard = () => {
 
   // Dữ liệu từ API
   const [requests, setRequests] = useState([]);
+  const [missionByRequestId, setMissionByRequestId] = useState({});
+  const [activeTeamRequestIds, setActiveTeamRequestIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -35,6 +118,19 @@ const CoordinatorDashboard = () => {
   const { mapRef, flyToRequest } = useMap(requests);
 
   // Thống kê
+  const requestsWithMission = useMemo(
+    () =>
+      requests.map((request) => {
+        const mission = missionByRequestId[String(request.id)] ?? null;
+        const isActiveTeamAssigned = activeTeamRequestIds.has(
+          String(request.id),
+        );
+        const stage = getRequestStage(request, mission, isActiveTeamAssigned);
+        return { ...request, mission, stage };
+      }),
+    [requests, missionByRequestId, activeTeamRequestIds],
+  );
+
   const stats = {
     emergency: requests.filter(
       (r) =>
@@ -48,7 +144,9 @@ const CoordinatorDashboard = () => {
     relief: requests.filter(
       (r) => r.type === "Hỗ trợ cứu trợ" && r.status === "PENDING",
     ).length,
-    inProgress: requests.filter((r) => r.status === "IN_PROGRESS").length,
+    accepted: requestsWithMission.filter((r) => r.stage === "accepted").length,
+    inProgress: requestsWithMission.filter((r) => r.stage === "inprogress")
+      .length,
     completed: requests.filter((r) => r.status === "COMPLETED").length,
     cancelled: requests.filter((r) => r.status === "CANCELLED").length,
   };
@@ -58,11 +156,30 @@ const CoordinatorDashboard = () => {
     try {
       setLoading(true);
       setError(null);
-      const result = await rescueRequestService.getAllRequests();
-      if (result.success) {
-        setRequests(result.data);
+      const [requestResult, missionResult, activeTeamsResult] =
+        await Promise.all([
+          rescueRequestService.getAllRequests(),
+          missionService.getAllMissions(),
+          missionService.getActiveTeamMissions(),
+        ]);
+
+      if (requestResult.success) {
+        setRequests(requestResult.data);
+        if (missionResult.success) {
+          setMissionByRequestId(buildLatestMissionMap(missionResult.data));
+        } else {
+          setMissionByRequestId({});
+        }
+
+        if (activeTeamsResult.success) {
+          setActiveTeamRequestIds(
+            buildActiveRequestIdSet(activeTeamsResult.data),
+          );
+        } else {
+          setActiveTeamRequestIds(new Set());
+        }
       } else {
-        setError(result.error);
+        setError(requestResult.error);
       }
     } catch (err) {
       console.error("Error in fetchRequests:", err);
@@ -80,8 +197,16 @@ const CoordinatorDashboard = () => {
 
   // Helper refresh danh sách
   const refreshRequests = async () => {
-    const updated = await rescueRequestService.getAllRequests();
+    const [updated, missions, activeTeams] = await Promise.all([
+      rescueRequestService.getAllRequests(),
+      missionService.getAllMissions(),
+      missionService.getActiveTeamMissions(),
+    ]);
     if (updated.success) setRequests(updated.data);
+    if (missions.success)
+      setMissionByRequestId(buildLatestMissionMap(missions.data));
+    if (activeTeams.success)
+      setActiveTeamRequestIds(buildActiveRequestIdSet(activeTeams.data));
   };
 
   // Handlers
@@ -91,7 +216,7 @@ const CoordinatorDashboard = () => {
       if (result.success) {
         alert("✅ " + result.message);
         await refreshRequests();
-        setTimeout(() => setActiveTab("inprogress"), 500);
+        setTimeout(() => setActiveTab("accepted"), 500);
       } else {
         alert("❌ " + result.error);
       }
@@ -101,11 +226,18 @@ const CoordinatorDashboard = () => {
   };
 
   const handleCompleteRequest = async (requestId) => {
-    try {
-      const result = await rescueRequestService.updateRequestStatus(
-        requestId,
-        "COMPLETED",
+    const mission = missionByRequestId[String(requestId)] ?? null;
+    if (!mission || mission.status !== "COMPLETED") {
+      alert(
+        "⚠️ Đội cứu hộ chưa gửi trạng thái hoàn thành. Bạn chỉ có thể xác nhận sau khi team báo cáo COMPLETED.",
       );
+      return;
+    }
+
+    try {
+      const result = await missionService.updateMissionStatus(mission.id, {
+        status: "COMPLETED",
+      });
       if (result.success) {
         await refreshRequests();
         setTimeout(() => setActiveTab("completed"), 500);
@@ -173,13 +305,15 @@ const CoordinatorDashboard = () => {
 
   // Filtered list
   const filteredRequests = requests.filter((request) => {
-    if (activeTab === "pending" && request.status !== "PENDING") return false;
-    if (activeTab === "inprogress" && request.status !== "IN_PROGRESS")
-      return false;
-    if (activeTab === "completed" && request.status !== "COMPLETED")
-      return false;
-    if (activeTab === "cancelled" && request.status !== "CANCELLED")
-      return false;
+    const mission = missionByRequestId[String(request.id)] ?? null;
+    const isActiveTeamAssigned = activeTeamRequestIds.has(String(request.id));
+    const stage = getRequestStage(request, mission, isActiveTeamAssigned);
+
+    if (activeTab === "pending" && stage !== "pending") return false;
+    if (activeTab === "accepted" && stage !== "accepted") return false;
+    if (activeTab === "inprogress" && stage !== "inprogress") return false;
+    if (activeTab === "completed" && stage !== "completed") return false;
+    if (activeTab === "cancelled" && stage !== "cancelled") return false;
 
     const matchesSearch =
       request.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -194,6 +328,13 @@ const CoordinatorDashboard = () => {
       matchesFilter = request.category === activeFilter;
 
     return matchesSearch && matchesFilter;
+  });
+
+  const requestCardData = filteredRequests.map((request) => {
+    const mission = missionByRequestId[String(request.id)] ?? null;
+    const isActiveTeamAssigned = activeTeamRequestIds.has(String(request.id));
+    const stage = getRequestStage(request, mission, isActiveTeamAssigned);
+    return { ...request, mission, stage };
   });
 
   return (
@@ -251,6 +392,8 @@ const CoordinatorDashboard = () => {
                 </p>
                 <p className="text-slate-400 text-sm mt-1">
                   {activeTab === "pending" && "Chưa có yêu cầu nào chờ xử lý"}
+                  {activeTab === "accepted" &&
+                    "Chưa có yêu cầu nào đã tiếp nhận (chờ phân công)"}
                   {activeTab === "inprogress" &&
                     "Chưa có yêu cầu nào đang xử lý"}
                   {activeTab === "completed" &&
@@ -260,15 +403,14 @@ const CoordinatorDashboard = () => {
                 </p>
               </div>
             ) : (
-              filteredRequests.map((request) => (
+              requestCardData.map((request) => (
                 <RequestCard
                   key={request.id}
                   request={request}
-                  onApprove={(id, action) =>
-                    action === "complete"
-                      ? handleCompleteRequest(id)
-                      : handleApproveRequest(id)
-                  }
+                  stage={request.stage}
+                  mission={request.mission}
+                  onApprove={handleApproveRequest}
+                  onComplete={handleCompleteRequest}
                   onCancel={openCancelModal}
                   onClassify={openClassifyModal}
                   onDetail={openDetailModal}
