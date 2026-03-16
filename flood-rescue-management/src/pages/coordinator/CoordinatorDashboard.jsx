@@ -95,6 +95,42 @@ const getRequestStage = (request, mission, isActiveTeamAssigned = false) => {
   return "pending";
 };
 
+/**
+ * Chuẩn hoá dữ liệu cho màn hình Coordinator trong 1 lần gọi API:
+ * - Danh sách request
+ * - Mission mới nhất theo requestId
+ * - Set requestId đang có team active
+ */
+const fetchCoordinatorSnapshot = async () => {
+  const [requestResult, missionResult, activeTeamsResult] = await Promise.all([
+    rescueRequestService.getAllRequests(),
+    missionService.getAllMissions(),
+    missionService.getActiveTeamMissions(),
+  ]);
+
+  if (!requestResult.success) {
+    return {
+      success: false,
+      error: requestResult.error,
+      requests: [],
+      missionMap: {},
+      activeRequestIds: new Set(),
+    };
+  }
+
+  return {
+    success: true,
+    error: null,
+    requests: requestResult.data,
+    missionMap: missionResult.success
+      ? buildLatestMissionMap(missionResult.data)
+      : {},
+    activeRequestIds: activeTeamsResult.success
+      ? buildActiveRequestIdSet(activeTeamsResult.data)
+      : new Set(),
+  };
+};
+
 const CoordinatorDashboard = () => {
   const [activeTab, setActiveTab] = useState("pending");
   const [activeFilter, setActiveFilter] = useState("all");
@@ -151,35 +187,20 @@ const CoordinatorDashboard = () => {
     cancelled: requests.filter((r) => r.status === "CANCELLED").length,
   };
 
-  // Fetch data từ API
+  // Fetch data từ API (có loading + error cho lần tải chính)
   const fetchRequests = async () => {
     try {
       setLoading(true);
       setError(null);
-      const [requestResult, missionResult, activeTeamsResult] =
-        await Promise.all([
-          rescueRequestService.getAllRequests(),
-          missionService.getAllMissions(),
-          missionService.getActiveTeamMissions(),
-        ]);
 
-      if (requestResult.success) {
-        setRequests(requestResult.data);
-        if (missionResult.success) {
-          setMissionByRequestId(buildLatestMissionMap(missionResult.data));
-        } else {
-          setMissionByRequestId({});
-        }
+      const snapshot = await fetchCoordinatorSnapshot();
 
-        if (activeTeamsResult.success) {
-          setActiveTeamRequestIds(
-            buildActiveRequestIdSet(activeTeamsResult.data),
-          );
-        } else {
-          setActiveTeamRequestIds(new Set());
-        }
+      if (snapshot.success) {
+        setRequests(snapshot.requests);
+        setMissionByRequestId(snapshot.missionMap);
+        setActiveTeamRequestIds(snapshot.activeRequestIds);
       } else {
-        setError(requestResult.error);
+        setError(snapshot.error);
       }
     } catch (err) {
       console.error("Error in fetchRequests:", err);
@@ -195,18 +216,14 @@ const CoordinatorDashboard = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Helper refresh danh sách
+  // Helper refresh nhẹ: không bật loading toàn màn hình
   const refreshRequests = async () => {
-    const [updated, missions, activeTeams] = await Promise.all([
-      rescueRequestService.getAllRequests(),
-      missionService.getAllMissions(),
-      missionService.getActiveTeamMissions(),
-    ]);
-    if (updated.success) setRequests(updated.data);
-    if (missions.success)
-      setMissionByRequestId(buildLatestMissionMap(missions.data));
-    if (activeTeams.success)
-      setActiveTeamRequestIds(buildActiveRequestIdSet(activeTeams.data));
+    const snapshot = await fetchCoordinatorSnapshot();
+    if (!snapshot.success) return;
+
+    setRequests(snapshot.requests);
+    setMissionByRequestId(snapshot.missionMap);
+    setActiveTeamRequestIds(snapshot.activeRequestIds);
   };
 
   // Handlers
@@ -303,11 +320,9 @@ const CoordinatorDashboard = () => {
     setAssignModalOpen(true);
   };
 
-  // Filtered list
-  const filteredRequests = requests.filter((request) => {
-    const mission = missionByRequestId[String(request.id)] ?? null;
-    const isActiveTeamAssigned = activeTeamRequestIds.has(String(request.id));
-    const stage = getRequestStage(request, mission, isActiveTeamAssigned);
+  // Filtered list: tận dụng requestsWithMission để tránh tính `stage` lặp lại
+  const filteredRequests = requestsWithMission.filter((request) => {
+    const stage = request.stage;
 
     if (activeTab === "pending" && stage !== "pending") return false;
     if (activeTab === "accepted" && stage !== "accepted") return false;
@@ -328,13 +343,6 @@ const CoordinatorDashboard = () => {
       matchesFilter = request.category === activeFilter;
 
     return matchesSearch && matchesFilter;
-  });
-
-  const requestCardData = filteredRequests.map((request) => {
-    const mission = missionByRequestId[String(request.id)] ?? null;
-    const isActiveTeamAssigned = activeTeamRequestIds.has(String(request.id));
-    const stage = getRequestStage(request, mission, isActiveTeamAssigned);
-    return { ...request, mission, stage };
   });
 
   return (
@@ -403,7 +411,7 @@ const CoordinatorDashboard = () => {
                 </p>
               </div>
             ) : (
-              requestCardData.map((request) => (
+              filteredRequests.map((request) => (
                 <RequestCard
                   key={request.id}
                   request={request}
