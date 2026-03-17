@@ -1,5 +1,5 @@
 import React from "react";
-import CoordinatorDashboard from "../pages/Coordinator/CoordinatorDashboard";
+import CoordinatorDashboard from "../pages/coordinator/CoordinatorDashboard";
 
 const CoordinatorRoutes = [
   {
