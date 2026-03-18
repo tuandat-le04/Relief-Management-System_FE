@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import authService from "../services/authService";
+import SOSVerificationModal from "../components/auth/SOSVerificationModal";
 
 const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -350,6 +351,8 @@ const Login = () => {
           </div>
         </div>
       </div>
+
+      <SOSVerificationModal />
     </div>
   );
 };
