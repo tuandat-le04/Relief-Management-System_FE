@@ -191,7 +191,7 @@ const AdminReports = () => {
                         {kpi.trend === "up" && <FiTrendingUp size={14} />}
                         {kpi.percentage}
                       </span>
-                      <span className="text-gray-500 text-xs font-mono">
+                      <span className="text-gray-500 text-xs">
                         {kpi.updated}
                       </span>
                     </div>
@@ -221,7 +221,7 @@ const AdminReports = () => {
                     </h3>
                     <div className="flex items-center gap-2">
                       <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
-                      <p className="text-gray-500 text-[10px] font-mono uppercase">
+                      <p className="text-gray-500 text-[10px] uppercase">
                         Live Activity
                       </p>
                     </div>

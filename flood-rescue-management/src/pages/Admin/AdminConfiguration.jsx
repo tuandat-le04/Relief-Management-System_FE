@@ -66,7 +66,7 @@ const AdminConfiguration = () => {
                 <MdHelp className="text-xl" />
               </button>
               <div className="h-4 w-[1px] bg-gray-200"></div>
-              <p className="text-gray-500 text-xs font-mono">V1.2.4-RC</p>
+              <p className="text-gray-500 text-xs">V1.2.4-RC</p>
             </div>
           </div>
         </header>

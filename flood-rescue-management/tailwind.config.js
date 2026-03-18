@@ -1,4 +1,6 @@
 /** @type {import('tailwindcss').Config} */
+const defaultTheme = require("tailwindcss/defaultTheme");
+
 module.exports = {
   content: [
     "./src/**/*.{js,jsx,ts,tsx}",
@@ -22,7 +24,8 @@ module.exports = {
         "text-secondary": "#94a3b8",
       },
       fontFamily: {
-        display: ["Inter", "Manrope", "sans-serif"],
+        sans: ["Inter", ...defaultTheme.fontFamily.sans],
+        display: ["Inter", ...defaultTheme.fontFamily.sans],
       },
       animation: {
         'radar': 'radar 2s infinite ease-out',
