@@ -16,16 +16,6 @@ const STORAGE_KEYS = {
   activeRequestId: "rescueTeam.activeRequestId",
   progressByRequestPrefix: "rescueTeam.progress.",
   reports: "rescueTeam.reports",
-  sosEvents: "rescueTeam.sosEvents",
-};
-
-const safeParseJson = (value, fallback) => {
-  try {
-    if (!value) return fallback;
-    return JSON.parse(value);
-  } catch {
-    return fallback;
-  }
 };
 
 const clampNumber = (value, min, max) => {
@@ -725,44 +715,6 @@ const RescueTeamDashboard = () => {
     document.title = "Quản Lý Nhiệm Vụ & Báo Cáo Cứu Hộ Hiện Trường";
   }, []);
 
-  const scrollToMap = () => {
-    mapRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-  };
-
-  const handleNavClick = (e, target) => {
-    e.preventDefault();
-    if (target === "tasks") {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    } else {
-      scrollToMap();
-    }
-  };
-
-  const handleSOS = async () => {
-    const ok = window.confirm(
-      "Bạn có chắc muốn gửi SOS? Hệ thống sẽ ghi nhận thời gian và vị trí (nếu có).",
-    );
-    if (!ok) return;
-
-    const event = {
-      at: Date.now(),
-      requestId: request?.id ?? null,
-      missionId: mission?.id ?? null,
-      coords: gps.coords,
-      user: authService.getCurrentUser()?.id ?? null,
-    };
-    const existing = safeParseJson(
-      localStorage.getItem(STORAGE_KEYS.sosEvents),
-      [],
-    );
-    localStorage.setItem(
-      STORAGE_KEYS.sosEvents,
-      JSON.stringify([event, ...existing].slice(0, 50)),
-    );
-
-    window.alert("Đã ghi nhận SOS. Vui lòng giữ an toàn.");
-  };
-
   const handleLogout = () => {
     try {
       localStorage.removeItem("token");
@@ -991,30 +943,6 @@ const RescueTeamDashboard = () => {
           </div>
         </div>
         <div className="flex items-center gap-4 lg:gap-6">
-          <nav className="hidden lg:flex items-center gap-2 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
-            <a
-              className="px-4 py-2 rounded-md bg-white dark:bg-gray-700 shadow-sm text-primary text-sm font-bold"
-              href="#"
-              onClick={(e) => handleNavClick(e, "tasks")}
-            >
-              Nhiệm vụ
-            </a>
-            <a
-              className="px-4 py-2 rounded-md text-[#6b7680] dark:text-gray-400 text-sm font-bold hover:text-primary transition-colors"
-              href="#"
-              onClick={(e) => handleNavClick(e, "map")}
-            >
-              Bản đồ
-            </a>
-          </nav>
-          <button
-            type="button"
-            className="flex items-center justify-center rounded-lg h-11 px-6 bg-red-600 hover:bg-red-700 text-white text-sm font-black shadow-lg shadow-red-600/30 transition-all active:scale-95 border-2 border-red-500"
-            onClick={handleSOS}
-          >
-            <span className="material-symbols-outlined mr-2">campaign</span>
-            <span>SOS</span>
-          </button>
           <button
             type="button"
             className="hidden md:flex items-center justify-center rounded-lg h-11 px-5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 text-sm font-black shadow-sm transition-all active:scale-95 border-2 border-gray-200 dark:border-gray-700"
@@ -1053,22 +981,6 @@ const RescueTeamDashboard = () => {
               <span className="bg-white/20 px-2.5 py-0.5 rounded text-xs font-bold">
                 {hasActiveMission ? 1 : 0}
               </span>
-            </div>
-            <div
-              className="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-              role="button"
-              tabIndex={0}
-              onClick={scrollToMap}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") scrollToMap();
-              }}
-            >
-              <span className="material-symbols-outlined">map</span>
-              <p className="text-sm font-bold">Bản đồ khu vực</p>
-            </div>
-            <div className="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-              <span className="material-symbols-outlined">history</span>
-              <p className="text-sm font-bold">Lịch sử</p>
             </div>
           </nav>
           <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-800">
@@ -1630,16 +1542,6 @@ const RescueTeamDashboard = () => {
           )}
         </section>
       </main>
-
-      <button
-        type="button"
-        className="lg:hidden fixed bottom-6 right-6 w-16 h-16 bg-red-600 rounded-full flex items-center justify-center text-white shadow-2xl z-50 ring-4 ring-red-600/30"
-        onClick={handleSOS}
-      >
-        <span className="material-symbols-outlined text-4xl">
-          emergency_share
-        </span>
-      </button>
 
       <button
         type="button"
