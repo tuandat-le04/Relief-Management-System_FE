@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Close as CloseIcon,
   ErrorOutline as ErrorOutlineIcon,
@@ -19,6 +19,10 @@ export default function Notification({
 }) {
   const [alerts, setAlerts] = useState(initialAlerts || []);
   const [filter, setFilter] = useState("all");
+
+  useEffect(() => {
+    setAlerts(initialAlerts || []);
+  }, [initialAlerts]);
 
   if (!isOpen) return null;
 

@@ -8,6 +8,7 @@ import AssignedMissionMapGoong from "../../components/rescueTeam/AssignedMission
 import MissionProgress from "../../components/rescueTeam/MissionProgress";
 import api from "../../services/api";
 import goongjs from "@goongmaps/goong-js";
+import avatarUser from "../../assets/images/avatar-user.png";
 import rescueRequestService, {
   getTimeAgo,
 } from "../../services/rescueRequestService";
@@ -969,14 +970,14 @@ const RescueTeamDashboard = () => {
       <header className="sticky top-0 z-50 flex items-center justify-between border-b border-solid border-[#e5e7eb] dark:border-[#374151] bg-white dark:bg-background-dark px-6 py-3 lg:px-10 shadow-sm">
         <div className="flex items-center gap-8">
           <div className="flex items-center gap-3">
-            <div className="bg-primary p-2 rounded-lg text-white shadow-lg shadow-primary/30">
+            <div className="resq-brand-mark shadow-lg shadow-primary/30">
               <span className="material-symbols-outlined block text-2xl">
                 emergency
               </span>
             </div>
             <div>
-              <h2 className="text-[#131416] dark:text-white text-xl font-black leading-tight tracking-tight uppercase">
-                Cứu Hộ VN
+              <h2 className="resq-brand-title text-xl leading-tight uppercase dark:text-white">
+                ResQ
               </h2>
               <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">
                 Team Alpha-1
@@ -1023,14 +1024,11 @@ const RescueTeamDashboard = () => {
             <span className="material-symbols-outlined mr-2">logout</span>
             <span>Đăng xuất</span>
           </button>
-          <div
-            className="h-11 w-11 rounded-full bg-cover bg-center border-2 border-white shadow-md ring-2 ring-primary/20"
-            data-alt="Ảnh đại diện đội trưởng đội cứu hộ"
-            style={{
-              backgroundImage:
-                'url("https://lh3.googleusercontent.com/aida-public/AB6AXuDuyHJht1Ui_YnTJY1DSTJcepL41z4IZMSumUIurIVYz9lef0hO7-k_3uGKOnurRxgL8dyP3uXt8LLnxj0am06PnWSIY2rEbTIWwBVHMyaX-Ubx2HcV_jmPv0vWeY7QjH7wnnbSuvmdF3a96wV66E8_Xkkm4SJzfiy5u8pZsR7Jg1GT1YRXxBBTCjsOtcNX1pL-AlsMP3II1iJxEO0E1UYqEpwzWTj6UZeSCvlEbrTbzEdxkZ8BFHsX9mCnN-_TbKVl9lw6NXuuRBM")',
-            }}
-          ></div>
+          <img
+            src={avatarUser}
+            alt="Ảnh đại diện đội trưởng đội cứu hộ"
+            className="h-11 w-11 rounded-full border-2 border-white shadow-md ring-2 ring-primary/20 object-cover"
+          />
         </div>
       </header>
 

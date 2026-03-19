@@ -79,14 +79,14 @@ const getRequestStage = (request, mission, isActiveTeamAssigned = false) => {
     return "inprogress";
   }
   if (missionStatus === "ASSIGNED") {
-    return "accepted";
+    // UX mới: sau khi phân đội (ASSIGNED) sẽ hiển thị ngay ở tab Đang xử lý
+    return "inprogress";
   }
 
   if (request.status === "PENDING") return "pending";
 
   if (request.status === "IN_PROGRESS") {
-    // Chỉ sang "Đang xử lý" khi team thực sự đã active trên mission.
-    // Tránh case backend auto tạo mission ngay sau approve làm nhảy tab sớm.
+    // Nếu chưa có mission rõ ràng thì vẫn giữ ở Đã tiếp nhận để tránh nhảy tab sớm.
     if (isActiveTeamAssigned) return "inprogress";
 
     return "accepted";

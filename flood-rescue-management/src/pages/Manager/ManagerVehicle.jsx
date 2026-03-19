@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import Sidebar from "../../components/manager/Sidebar";
 import vehicleService from "../../services/vehicleService";
+import { getActiveVehicleTypes } from "../../services/adminCatalogService";
 import {
   LocalShipping as TruckIcon,
   DirectionsBoat as BoatIcon,
@@ -21,16 +22,6 @@ import {
   Close as CloseIcon,
 } from "@mui/icons-material";
 
-// ── Danh mục loại phương tiện (API enum) ─────────────────────────────────────
-const VEHICLE_TYPES = [
-  { value: "BOAT", label: "Cano / Xuồng" },
-  { value: "TRUCK", label: "Xe tải" },
-  { value: "HELICOPTER", label: "Trực thăng" },
-  { value: "DRONE", label: "Drone / UAV" },
-  { value: "CAR", label: "Xe con" },
-  { value: "VAN", label: "Xe van" },
-];
-
 // ⚠ Theo API.md §3.1: Trạng thái MAINTENANCE đã bị loại bỏ khỏi hệ thống.
 // Backend quản lý tự động: tạo mới → AVAILABLE; assign-vehicle → IN_USE; COMPLETED/CANCELLED → AVAILABLE.
 const API_STATUSES = ["AVAILABLE", "IN_USE"];
@@ -45,11 +36,47 @@ const getVehicleIcon = (type) => {
   return <TruckIcon />;
 };
 
-const getVehicleTypeName = (type) => {
-  const found = VEHICLE_TYPES.find(
-    (t) => t.value.toUpperCase() === (type || "").toUpperCase(),
-  );
-  return found ? found.label : type || "Khác";
+const normalizeVehicleTypeOption = (vehicleType) => {
+  const value =
+    vehicleType?.name || vehicleType?.value || vehicleType?.type || "";
+  return {
+    id: vehicleType?.id,
+    value: String(value || "").trim(),
+    label: String(value || "").trim(),
+  };
+};
+
+const resolveVehicleTypeOption = (vehicle, vehicleTypeOptions = []) => {
+  const normalizedType = String(vehicle?.typeRaw || "").toUpperCase();
+  const vehicleTypeId = vehicle?.vehicleTypeId;
+
+  if (vehicleTypeId !== undefined && vehicleTypeId !== null) {
+    const byId = vehicleTypeOptions.find(
+      (t) => String(t.id) === String(vehicleTypeId),
+    );
+    if (byId) return byId;
+  }
+
+  if (normalizedType) {
+    const byType = vehicleTypeOptions.find(
+      (t) => (t.value || "").toUpperCase() === normalizedType,
+    );
+    if (byType) return byType;
+  }
+
+  return null;
+};
+
+const getVehicleTypeName = (vehicle, vehicleTypeOptions = []) => {
+  const resolved = resolveVehicleTypeOption(vehicle, vehicleTypeOptions);
+  if (resolved) return resolved.label;
+  return vehicle?.typeRaw || "Khác";
+};
+
+const getVehicleTypeValue = (vehicle, vehicleTypeOptions = []) => {
+  const resolved = resolveVehicleTypeOption(vehicle, vehicleTypeOptions);
+  if (resolved) return resolved.value;
+  return String(vehicle?.typeRaw || "").trim();
 };
 
 const getStatusInfo = (statusRaw) => {
@@ -82,10 +109,24 @@ const getStatusInfo = (statusRaw) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // Modal Thêm / Sửa phương tiện
 // ─────────────────────────────────────────────────────────────────────────────
-const VehicleFormModal = ({ isOpen, onClose, onSuccess, editVehicle }) => {
+const VehicleFormModal = ({
+  isOpen,
+  onClose,
+  onSuccess,
+  editVehicle,
+  vehicleTypeOptions,
+  vehicleTypesLoading,
+}) => {
   const isEdit = !!editVehicle;
+  const selectableVehicleTypes = React.useMemo(
+    () =>
+      (vehicleTypeOptions || []).filter(
+        (t) => t.id !== undefined && t.id !== null,
+      ),
+    [vehicleTypeOptions],
+  );
   const [form, setForm] = useState({
-    type: "BOAT",
+    vehicleTypeId: "",
     model: "",
     licensePlate: "",
     capacityPerson: 1,
@@ -98,9 +139,19 @@ const VehicleFormModal = ({ isOpen, onClose, onSuccess, editVehicle }) => {
   useEffect(() => {
     if (isOpen) {
       setError(null);
+      const defaultTypeId = selectableVehicleTypes[0]?.id
+        ? String(selectableVehicleTypes[0].id)
+        : "";
       if (isEdit) {
+        const resolvedTypeOption = resolveVehicleTypeOption(
+          editVehicle,
+          vehicleTypeOptions,
+        );
         setForm({
-          type: editVehicle.typeRaw || "BOAT",
+          vehicleTypeId:
+            resolvedTypeOption?.id !== undefined && resolvedTypeOption?.id !== null
+              ? String(resolvedTypeOption.id)
+              : defaultTypeId,
           model: editVehicle.model || "",
           licensePlate: editVehicle.licensePlate || "",
           capacityPerson: editVehicle.capacityPerson || 1,
@@ -109,7 +160,7 @@ const VehicleFormModal = ({ isOpen, onClose, onSuccess, editVehicle }) => {
         });
       } else {
         setForm({
-          type: "BOAT",
+          vehicleTypeId: defaultTypeId,
           model: "",
           licensePlate: "",
           capacityPerson: 1,
@@ -118,13 +169,17 @@ const VehicleFormModal = ({ isOpen, onClose, onSuccess, editVehicle }) => {
         });
       }
     }
-  }, [isOpen, editVehicle]);
+  }, [isOpen, editVehicle, vehicleTypeOptions, selectableVehicleTypes]);
 
   const handleChange = (field, value) =>
     setForm((p) => ({ ...p, [field]: value }));
 
   const handleSubmit = async () => {
-    if (!form.type) {
+    if (!selectableVehicleTypes.length) {
+      setError("Chưa có loại phương tiện khả dụng từ Admin");
+      return;
+    }
+    if (!form.vehicleTypeId) {
       setError("Vui lòng chọn loại phương tiện");
       return;
     }
@@ -138,11 +193,22 @@ const VehicleFormModal = ({ isOpen, onClose, onSuccess, editVehicle }) => {
     }
     setSaving(true);
     setError(null);
+    const selectedTypeOption = selectableVehicleTypes.find(
+      (t) => String(t.id) === String(form.vehicleTypeId),
+    );
+    if (!selectedTypeOption) {
+      setSaving(false);
+      setError("Loại phương tiện không hợp lệ");
+      return;
+    }
+
     const payload = {
-      type: form.type,
+      vehicleTypeId: Number(form.vehicleTypeId),
+      type: selectedTypeOption.value,
       licensePlate: form.licensePlate,
       capacityPerson: Number(form.capacityPerson),
-      // ⚠ Không gửi status — Backend quản lý tự động (API.md §3.1)
+      // API hiện tại yêu cầu status trong body create/update
+      status: form.status || "AVAILABLE",
       ...(form.model && { model: form.model }),
       ...(form.depotId && { depotId: Number(form.depotId) }),
     };
@@ -180,15 +246,24 @@ const VehicleFormModal = ({ isOpen, onClose, onSuccess, editVehicle }) => {
               Loại phương tiện <span className="text-red-500">*</span>
             </label>
             <select
-              value={form.type}
-              onChange={(e) => handleChange("type", e.target.value)}
+              value={form.vehicleTypeId}
+              onChange={(e) => handleChange("vehicleTypeId", e.target.value)}
+              disabled={vehicleTypesLoading || selectableVehicleTypes.length === 0}
               className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              {VEHICLE_TYPES.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
+              {selectableVehicleTypes.length === 0 ? (
+                <option value="">
+                  {vehicleTypesLoading
+                    ? "Đang tải loại phương tiện..."
+                    : "Chưa có loại phương tiện"}
                 </option>
-              ))}
+              ) : (
+                selectableVehicleTypes.map((t) => (
+                  <option key={t.id} value={String(t.id)}>
+                    {t.label}
+                  </option>
+                ))
+              )}
             </select>
           </div>
           <div>
@@ -259,7 +334,9 @@ const VehicleFormModal = ({ isOpen, onClose, onSuccess, editVehicle }) => {
           </button>
           <button
             onClick={handleSubmit}
-            disabled={saving}
+            disabled={
+              saving || vehicleTypesLoading || selectableVehicleTypes.length === 0
+            }
             className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 text-white text-sm font-bold transition-all flex items-center gap-2"
           >
             {saving && (
@@ -415,7 +492,7 @@ const DeleteConfirmModal = ({ isOpen, onClose, vehicle, onSuccess }) => {
     const result = await vehicleService.deleteVehicle(vehicle.id);
     setDeleting(false);
     if (result.success) {
-      onSuccess("Xóa phương tiện thành công");
+      onSuccess(result.message || "Xóa phương tiện thành công");
       onClose();
     } else setError(result.error);
   };
@@ -486,6 +563,8 @@ export default function ManagerVehicle() {
 
   // Dữ liệu từ API
   const [vehicles, setVehicles] = useState([]);
+  const [vehicleTypeOptions, setVehicleTypeOptions] = useState([]);
+  const [vehicleTypesLoading, setVehicleTypesLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [toast, setToast] = useState(null); // { type: 'success'|'error', msg }
@@ -506,9 +585,31 @@ export default function ManagerVehicle() {
     else setError(result.error || "Không thể tải dữ liệu phương tiện");
   }, []);
 
+  const fetchVehicleTypes = useCallback(async () => {
+    setVehicleTypesLoading(true);
+    try {
+      const response = await getActiveVehicleTypes();
+      if (response?.success && Array.isArray(response?.data)) {
+        setVehicleTypeOptions(
+          response.data
+            .map(normalizeVehicleTypeOption)
+            .filter((t) => t.value.length > 0),
+        );
+      } else {
+        setVehicleTypeOptions([]);
+      }
+    } catch (e) {
+      console.error("Không thể tải danh mục loại phương tiện:", e);
+      setVehicleTypeOptions([]);
+    } finally {
+      setVehicleTypesLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchVehicles();
-  }, [fetchVehicles]);
+    fetchVehicleTypes();
+  }, [fetchVehicles, fetchVehicleTypes]);
 
   // ── Toast ─────────────────────────────────────────────────────────────────
   const showToast = (type, msg) => {
@@ -518,7 +619,32 @@ export default function ManagerVehicle() {
   const handleActionSuccess = (msg) => {
     showToast("success", msg);
     fetchVehicles();
+    fetchVehicleTypes();
   };
+
+  const availableTypeFilters = React.useMemo(() => {
+    const fromAdmin = vehicleTypeOptions.map((t) => ({
+      value: t.value,
+      label: t.label,
+    }));
+    const existingTypeMap = new Map(
+      fromAdmin.map((t) => [t.value.toUpperCase(), t]),
+    );
+
+    vehicles.forEach((v) => {
+      const value = getVehicleTypeValue(v, vehicleTypeOptions);
+      if (!value) return;
+      const key = value.toUpperCase();
+      if (!existingTypeMap.has(key)) {
+        existingTypeMap.set(key, {
+          value,
+          label: getVehicleTypeName(v, vehicleTypeOptions),
+        });
+      }
+    });
+
+    return Array.from(existingTypeMap.values());
+  }, [vehicleTypeOptions, vehicles]);
 
   // ── Mở modal ─────────────────────────────────────────────────────────────
   const openAddModal = () => {
@@ -537,13 +663,15 @@ export default function ManagerVehicle() {
   // ── Filter ────────────────────────────────────────────────────────────────
   const filteredVehicles = vehicles.filter((v) => {
     const q = searchTerm.toLowerCase();
+    const vehicleTypeValue = getVehicleTypeValue(v, vehicleTypeOptions);
     const matchSearch =
       v.code.toLowerCase().includes(q) ||
       (v.model || "").toLowerCase().includes(q) ||
       (v.licensePlate || "").toLowerCase().includes(q) ||
       (v.team || "").toLowerCase().includes(q);
     const matchType =
-      !selectedType || (v.typeRaw || "").toUpperCase() === selectedType;
+      !selectedType ||
+      vehicleTypeValue.toUpperCase() === selectedType.toUpperCase();
     const matchStatus = !selectedStatus || v.statusRaw === selectedStatus;
     return matchSearch && matchType && matchStatus;
   });
@@ -736,7 +864,7 @@ export default function ManagerVehicle() {
                   className="bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-900 focus:ring-2 focus:ring-blue-500 cursor-pointer hover:bg-slate-100 font-medium"
                 >
                   <option value="">Tất cả loại xe</option>
-                  {VEHICLE_TYPES.map((t) => (
+                  {availableTypeFilters.map((t) => (
                     <option key={t.value} value={t.value}>
                       {t.label}
                     </option>
@@ -849,7 +977,10 @@ export default function ManagerVehicle() {
                                   {getVehicleIcon(vehicle.typeRaw)}
                                 </div>
                                 <span className="text-sm font-semibold text-slate-900">
-                                  {getVehicleTypeName(vehicle.typeRaw)}
+                                  {getVehicleTypeName(
+                                    vehicle,
+                                    vehicleTypeOptions,
+                                  )}
                                 </span>
                               </div>
                             </td>
@@ -872,11 +1003,12 @@ export default function ManagerVehicle() {
                               >
                                 {si.icon} {si.label}
                               </span>
-                              {vehicle.statusRaw === "IN_USE" && vehicle.currentMissionId && (
-                                <p className="text-xs text-slate-400 mt-1">
-                                  Nhiệm vụ #{vehicle.currentMissionId}
-                                </p>
-                              )}
+                              {vehicle.statusRaw === "IN_USE" &&
+                                vehicle.currentMissionId && (
+                                  <p className="text-xs text-slate-400 mt-1">
+                                    Nhiệm vụ #{vehicle.currentMissionId}
+                                  </p>
+                                )}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-right">
                               <div className="flex items-center justify-end gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
@@ -957,7 +1089,10 @@ export default function ManagerVehicle() {
                           {vehicle.code}
                         </h3>
                         <p className="text-xs text-slate-500 font-medium">
-                          {getVehicleTypeName(vehicle.typeRaw)}
+                          {getVehicleTypeName(
+                            vehicle,
+                            vehicleTypeOptions,
+                          )}
                           {vehicle.model ? ` — ${vehicle.model}` : ""}
                         </p>
                         <div className="flex items-center gap-1 text-xs text-slate-600">
@@ -983,11 +1118,12 @@ export default function ManagerVehicle() {
                         </p>
                       </div>
                       <div className="flex items-center gap-2 pt-4 border-t border-slate-200">
-                        {vehicle.statusRaw === "IN_USE" && vehicle.currentMissionId && (
-                          <span className="flex-1 text-xs text-slate-500 font-medium">
-                            📋 Nhiệm vụ #{vehicle.currentMissionId}
-                          </span>
-                        )}
+                        {vehicle.statusRaw === "IN_USE" &&
+                          vehicle.currentMissionId && (
+                            <span className="flex-1 text-xs text-slate-500 font-medium">
+                              📋 Nhiệm vụ #{vehicle.currentMissionId}
+                            </span>
+                          )}
                         <button
                           onClick={() => openEditModal(vehicle)}
                           disabled={vehicle.statusRaw === "IN_USE"}
@@ -1028,6 +1164,8 @@ export default function ManagerVehicle() {
         onClose={() => setFormOpen(false)}
         editVehicle={editVehicle}
         onSuccess={handleActionSuccess}
+        vehicleTypeOptions={vehicleTypeOptions}
+        vehicleTypesLoading={vehicleTypesLoading}
       />
       <DeleteConfirmModal
         isOpen={deleteModalOpen}

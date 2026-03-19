@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import avatarUser from "../../assets/images/avatar-user.png";
 
 export default function Sidebar() {
   const location = useLocation();
@@ -28,25 +29,17 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="w-72 bg-gradient-to-b from-white to-gray-50 border-r border-gray-200 flex flex-col shrink-0 shadow-2xl">
+    <aside className="w-72 sticky top-0 h-screen overflow-y-auto bg-gradient-to-b from-white to-gray-50 border-r border-gray-200 flex flex-col shrink-0 shadow-2xl">
       {/* Header Section */}
       <div className="p-6 pb-4">
         <div className="flex items-center gap-3 mb-8 p-3 rounded-xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 backdrop-blur-sm">
-          <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-2.5 rounded-xl shadow-lg shadow-emerald-500/20">
-            <svg
-              className="w-6 h-6 text-white"
-              fill="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3zm-1 16h2v-6h-2v6zm0-8h2V7h-2v3z" />
-            </svg>
+          <div className="resq-brand-mark-sm">
+            <span className="material-symbols-outlined text-xl">emergency</span>
           </div>
           <div>
-            <h1 className="text-gray-800 text-lg font-bold leading-tight tracking-tight">
-              ReliefAdmin VN
-            </h1>
-            <p className="text-gray-600 text-xs font-medium mt-0.5">
-              Hệ thống điều phối cứu trợ
+            <h1 className="resq-brand-title text-lg leading-tight">ResQ</h1>
+            <p className="resq-brand-subtitle mt-0.5 normal-case tracking-normal text-gray-600">
+              Quản trị hệ thống
             </p>
           </div>
         </div>
@@ -139,15 +132,11 @@ export default function Sidebar() {
             className="group w-full flex items-center gap-3 p-3 rounded-xl hover:bg-gray-100 cursor-pointer transition-all duration-300 border border-transparent hover:border-gray-200 hover:shadow-lg"
           >
             <div className="relative">
-              <div className="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full w-11 h-11 flex items-center justify-center border-2 border-emerald-300 shadow-lg group-hover:border-emerald-500 transition-all duration-300 group-hover:scale-105">
-                <svg
-                  className="w-6 h-6 text-white"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-                </svg>
-              </div>
+              <img
+                src={avatarUser}
+                alt="Avatar người dùng"
+                className="resq-user-avatar w-11 h-11 border-emerald-300 shadow-lg group-hover:border-emerald-500 transition-all duration-300 group-hover:scale-105"
+              />
               <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full shadow-lg shadow-green-500/50 animate-pulse"></div>
             </div>
             <div className="flex-1 overflow-hidden text-left">

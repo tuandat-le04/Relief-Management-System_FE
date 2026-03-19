@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import avatarUser from "../../assets/images/avatar-user.png";
 
 export default function Sidebar() {
   const location = useLocation();
@@ -13,25 +14,17 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="w-72 bg-gradient-to-b from-white to-gray-50 border-r border-gray-200 flex flex-col shrink-0 shadow-2xl">
+    <aside className="w-72 sticky top-0 h-screen overflow-y-auto bg-gradient-to-b from-white to-gray-50 border-r border-gray-200 flex flex-col shrink-0 shadow-2xl">
       {/* Header Section */}
       <div className="p-6 pb-4">
         <div className="flex items-center gap-3 mb-8 p-3 rounded-xl bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 backdrop-blur-sm">
-          <div className="bg-gradient-to-br from-blue-500 to-cyan-600 p-2.5 rounded-xl shadow-lg shadow-blue-500/20">
-            <svg
-              className="w-6 h-6 text-white"
-              fill="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path d="M20 6h-2.18c.11-.31.18-.65.18-1a2.996 2.996 0 0 0-5.5-1.65l-.5.67-.5-.68C10.96 2.54 10.05 2 9 2 7.34 2 6 3.34 6 5c0 .35.07.69.18 1H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-5-2c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zM9 4c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm11 15H4v-2h16v2zm0-5H4V8h5.08L7 10.83 8.62 12 11 8.76l1-1.36 1 1.36L15.38 12 17 10.83 14.92 8H20v6z" />
-            </svg>
+          <div className="resq-brand-mark-sm">
+            <span className="material-symbols-outlined text-xl">emergency</span>
           </div>
           <div>
-            <h1 className="text-gray-800 text-lg font-bold leading-tight tracking-tight">
-              ReliefOps VN
-            </h1>
-            <p className="text-gray-600 text-xs font-medium mt-0.5">
-              Quản lý cứu trợ thông minh
+            <h1 className="resq-brand-title text-lg leading-tight">ResQ</h1>
+            <p className="resq-brand-subtitle mt-0.5 normal-case tracking-normal text-gray-600">
+              Quản lý vận hành
             </p>
           </div>
         </div>
@@ -141,13 +134,11 @@ export default function Sidebar() {
           className="group flex items-center gap-3 p-3 rounded-xl hover:bg-gray-100 cursor-pointer transition-all duration-300 border border-transparent hover:border-gray-200 hover:shadow-lg w-full"
         >
           <div className="relative">
-            <div
-              className="bg-center bg-no-repeat bg-cover rounded-full w-11 h-11 border-2 border-blue-300 shadow-lg group-hover:border-blue-500 transition-all duration-300 group-hover:scale-105"
-              style={{
-                backgroundImage:
-                  'url("https://lh3.googleusercontent.com/aida-public/AB6AXuB3KdN6FBpwEbTMy4gd3fOtxJim3gyInXJABrlB1yjj_H3OTtYXrOAn3RgOs3lb_PxPcVAD9GF4a9i6wVOjGvrKtb2dicDeEJOK2SuL50rGjAeAhpB5MXMXMhtxYWnbvmTTVzWAVbCT9Pj82OYxDhy_jIaekKTjTD17L9bS4ZG-LLuITocX-MArXdkpiI1a7VOuvgkNoOM8xnTQNLl462S9dc96-yvCSPwZvzzQYjOTJWj6rIge_nQTO95XtIbZKayRs5mSJvciGaY")',
-              }}
-            ></div>
+            <img
+              src={avatarUser}
+              alt="Avatar người dùng"
+              className="resq-user-avatar w-11 h-11 border-blue-300 shadow-lg group-hover:border-blue-500 transition-all duration-300 group-hover:scale-105"
+            />
             <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full shadow-lg shadow-green-500/50 animate-pulse"></div>
           </div>
           <div className="flex-1 overflow-hidden text-left">

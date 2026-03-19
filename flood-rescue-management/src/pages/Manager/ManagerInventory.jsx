@@ -33,7 +33,7 @@ import { getActiveItems } from "../../services/adminCatalogService";
 
 const ITEM_TYPE_CONFIG = {
   FOOD: {
-    label: "Thuc pham",
+    label: "Thực phẩm",
     smallIcon: null,
     bigIcon: null,
     iconBg: "bg-gradient-to-br from-orange-500 to-amber-600",
@@ -42,7 +42,7 @@ const ITEM_TYPE_CONFIG = {
     statsBorder: "border-orange-200 hover:border-orange-300",
   },
   DRINK: {
-    label: "Nuoc uong",
+    label: "Nước uống",
     smallIcon: null,
     bigIcon: null,
     iconBg: "bg-gradient-to-br from-cyan-500 to-blue-600",
@@ -51,7 +51,7 @@ const ITEM_TYPE_CONFIG = {
     statsBorder: "border-cyan-200 hover:border-cyan-300",
   },
   MEDICAL_SUPPLIES: {
-    label: "Vat tu y te",
+    label: "Vật tư y tế",
     smallIcon: null,
     bigIcon: null,
     iconBg: "bg-gradient-to-br from-red-500 to-pink-600",
@@ -63,15 +63,15 @@ const ITEM_TYPE_CONFIG = {
 
 const WAREHOUSE_STATUS_CONFIG = {
   ACTIVE: {
-    label: "Hoat dong",
+    label: "Hoạt động",
     style: "bg-emerald-100 text-emerald-700",
   },
   INACTIVE: {
-    label: "Tam ngung",
+    label: "Tạm ngưng",
     style: "bg-slate-100 text-slate-600",
   },
   LOCKED: {
-    label: "Bi khoa",
+    label: "Bị khóa",
     style: "bg-red-100 text-red-700",
   },
 };
@@ -201,7 +201,7 @@ export default function ManagerInventory() {
         setCatalogItems(catalogRes.data);
       }
     } catch (err) {
-      setError("Khong the tai du lieu. Vui long thu lai.");
+      setError("Không thể tải dữ liệu. Vui lòng thử lại.");
       console.error(err);
     } finally {
       setLoading(false);
@@ -214,7 +214,7 @@ export default function ManagerInventory() {
       const response = await getWarehouseInventory(warehouseId);
       if (response.success) setInventoryData(response.data);
     } catch (err) {
-      console.error("Loi tai ton kho:", err);
+      console.error("Lỗi tải tồn kho:", err);
       setInventoryData(null);
     } finally {
       setInventoryLoading(false);
@@ -294,10 +294,10 @@ export default function ManagerInventory() {
         setInventoryData(response.data);
         setShowInventoryInModal(false);
         setInventoryInForm({ itemId: "", quantity: "" });
-        showToast("success", "Nhap kho thanh cong!");
+        showToast("success", "Nhập kho thành công!");
       }
     } catch (err) {
-      showToast("error", err.response?.data?.message || "Loi khi nhap kho!");
+      showToast("error", err.response?.data?.message || "Lỗi khi nhập kho!");
     } finally {
       setSubmitting(false);
     }
@@ -316,10 +316,10 @@ export default function ManagerInventory() {
         setInventoryData(response.data);
         setShowInventoryOutModal(false);
         setInventoryOutForm({ itemId: "", quantity: "" });
-        showToast("success", "Xuat kho thanh cong!");
+        showToast("success", "Xuất kho thành công!");
       }
     } catch (err) {
-      showToast("error", err.response?.data?.message || "Loi khi xuat kho!");
+      showToast("error", err.response?.data?.message || "Lỗi khi xuất kho!");
     } finally {
       setSubmitting(false);
     }
@@ -347,10 +347,10 @@ export default function ManagerInventory() {
           longitude: "",
           address: "",
         });
-        showToast("success", "Tao kho moi thanh cong!");
+        showToast("success", "Tạo kho mới thành công!");
       }
     } catch (err) {
-      showToast("error", err.response?.data?.message || "Loi khi tao kho!");
+      showToast("error", err.response?.data?.message || "Lỗi khi tạo kho!");
     } finally {
       setSubmitting(false);
     }
@@ -377,12 +377,12 @@ export default function ManagerInventory() {
           householdIdentifier: "",
           isConfirmed: false,
         });
-        showToast("success", "Ghi nhan phan phoi cuu tro thanh cong!");
+        showToast("success", "Ghi nhận phân phối cứu trợ thành công!");
       }
     } catch (err) {
       showToast(
         "error",
-        err.response?.data?.message || "Loi khi phan phoi cuu tro!",
+        err.response?.data?.message || "Lỗi khi phân phối cứu trợ!",
       );
     } finally {
       setSubmitting(false);
@@ -437,7 +437,7 @@ export default function ManagerInventory() {
                   className="text-blue-500 animate-spin mb-4"
                 />
                 <p className="text-slate-600 font-semibold">
-                  Dang tai du lieu...
+                  Đang tải dữ liệu...
                 </p>
               </div>
             </div>
@@ -449,14 +449,14 @@ export default function ManagerInventory() {
               <div className="flex items-center gap-3">
                 <WarningIcon sx={{ fontSize: 24 }} className="text-red-600" />
                 <div>
-                  <h3 className="font-bold text-red-900">Loi tai du lieu</h3>
+                  <h3 className="font-bold text-red-900">Lỗi tải dữ liệu</h3>
                   <p className="text-sm text-red-700">{error}</p>
                 </div>
                 <button
                   onClick={fetchInitialData}
                   className="ml-auto px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors text-sm font-semibold"
                 >
-                  Thu lai
+                  Thử lại
                 </button>
               </div>
             </div>
@@ -469,10 +469,10 @@ export default function ManagerInventory() {
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-2">
                   <div>
                     <h1 className="text-4xl font-bold text-slate-900 tracking-tight">
-                      Quan Ly Kho Hang
+                      Quản Lý Kho Hàng
                     </h1>
                     <p className="text-slate-500 text-sm mt-1">
-                      Theo doi ton kho · Nhap/Xuat hang · Phan phoi cuu tro
+                      Theo dõi tồn kho · Nhập/Xuất hàng · Phân phối cứu trợ
                       &bull;{" "}
                       <span className="text-slate-700 font-semibold">
                         {new Date().toLocaleDateString("vi-VN", {
@@ -491,19 +491,19 @@ export default function ManagerInventory() {
                       className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-semibold text-sm transition-all shadow-sm hover:shadow"
                     >
                       <RefreshIcon sx={{ fontSize: 18 }} />
-                      Lam moi
+                      Làm mới
                     </button>
                     <button
                       onClick={() => setShowCreateWarehouseModal(true)}
                       className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-violet-50 border border-violet-300 rounded-xl text-violet-700 font-semibold text-sm transition-all shadow-sm hover:shadow"
                     >
                       <WarehouseIcon sx={{ fontSize: 18 }} />
-                      Tao kho moi
+                      Tạo kho mới
                     </button>
                     <button
                       onClick={() => {
                         if (!selectedWarehouseId) {
-                          showToast("error", "Vui long chon kho truoc!");
+                          showToast("error", "Vui lòng chọn kho trước!");
                           return;
                         }
                         setShowInventoryOutModal(true);
@@ -511,12 +511,12 @@ export default function ManagerInventory() {
                       className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-amber-50 border border-amber-300 rounded-xl text-amber-700 font-semibold text-sm transition-all shadow-sm hover:shadow"
                     >
                       <TrendingDownIcon sx={{ fontSize: 18 }} />
-                      Xuat kho
+                      Xuất kho
                     </button>
                     <button
                       onClick={() => {
                         if (!selectedWarehouseId) {
-                          showToast("error", "Vui long chon kho truoc!");
+                          showToast("error", "Vui lòng chọn kho trước!");
                           return;
                         }
                         setShowInventoryInModal(true);
@@ -524,14 +524,14 @@ export default function ManagerInventory() {
                       className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-semibold text-sm transition-all shadow-lg shadow-emerald-500/20"
                     >
                       <TrendingUpIcon sx={{ fontSize: 18 }} />
-                      Nhap kho
+                      Nhập kho
                     </button>
                     <button
                       onClick={() => setShowReliefDistModal(true)}
                       className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-semibold text-sm transition-all shadow-lg shadow-blue-500/20"
                     >
                       <DistributeIcon sx={{ fontSize: 18 }} />
-                      Phan phoi cuu tro
+                      Phân phối cứu trợ
                     </button>
                   </div>
                 </div>
@@ -547,7 +547,7 @@ export default function ManagerInventory() {
                     </div>
                     <div>
                       <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                        Tong so kho
+                        Tổng số kho
                       </p>
                       <p className="text-3xl font-bold text-slate-900">
                         {warehouses.length}
@@ -599,7 +599,7 @@ export default function ManagerInventory() {
                       <span className="font-semibold text-slate-700">
                         {stat.itemCount}
                       </span>{" "}
-                      loai hang hoa trong kho duoc chon
+                      loại hàng hóa trong kho được chọn
                     </p>
                   </div>
                 ))}
@@ -615,7 +615,7 @@ export default function ManagerInventory() {
                       </div>
                       <div>
                         <h2 className="text-lg font-bold text-slate-900">
-                          Ton kho chi tiet
+                          Tồn kho chi tiết
                         </h2>
                         {selectedWarehouse && (
                           <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
@@ -641,7 +641,7 @@ export default function ManagerInventory() {
                       />
                       <input
                         type="text"
-                        placeholder="Tim kiem hang hoa..."
+                        placeholder="Tìm kiếm hàng hóa..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
@@ -679,7 +679,7 @@ export default function ManagerInventory() {
                     ))}
                     {warehouses.length === 0 && (
                       <p className="text-sm text-slate-400 italic">
-                        Chua co kho nao. Hay tao kho moi.
+                        Chưa có kho nào. Hãy tạo kho mới.
                       </p>
                     )}
                   </div>
@@ -693,7 +693,7 @@ export default function ManagerInventory() {
                       className="text-blue-400 animate-spin mr-3"
                     />
                     <span className="text-slate-500 font-medium">
-                      Dang tai ton kho...
+                      Đang tải tồn kho...
                     </span>
                   </div>
                 ) : filteredItems.length === 0 ? (
@@ -704,15 +704,15 @@ export default function ManagerInventory() {
                     />
                     <p className="font-semibold">
                       {searchQuery
-                        ? "Khong tim thay hang hoa phu hop"
-                        : "Kho hien tai chua co hang hoa"}
+                        ? "Không tìm thấy hàng hóa phù hợp"
+                        : "Kho hiện tại chưa có hàng hóa"}
                     </p>
                     {!searchQuery && selectedWarehouseId && (
                       <button
                         onClick={() => setShowInventoryInModal(true)}
                         className="mt-3 flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 transition-colors"
                       >
-                        <AddIcon sx={{ fontSize: 16 }} /> Nhap hang vao kho
+                        <AddIcon sx={{ fontSize: 16 }} /> Nhập hàng vào kho
                       </button>
                     )}
                   </div>
@@ -722,22 +722,22 @@ export default function ManagerInventory() {
                       <thead className="bg-slate-50 border-b border-slate-100">
                         <tr>
                           <th className="px-6 py-3.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
-                            Hang hoa
+                            Hàng hóa
                           </th>
                           <th className="px-6 py-3.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
-                            Phan loai
+                            Phân loại
                           </th>
                           <th className="px-6 py-3.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
-                            Don vi / Dung tich
+                            Đơn vị / Dung tích
                           </th>
                           <th className="px-6 py-3.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
-                            Ton kho
+                            Tồn kho
                           </th>
                           <th className="px-6 py-3.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
-                            Trang thai
+                            Trạng thái
                           </th>
                           <th className="px-6 py-3.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
-                            Cap nhat cuoi
+                            Cập nhật cuối
                           </th>
                         </tr>
                       </thead>
@@ -786,7 +786,7 @@ export default function ManagerInventory() {
                                   </span>
                                 ) : (
                                   <span className="text-xs text-slate-400 italic">
-                                    Khong xac dinh
+                                    Không xác định
                                   </span>
                                 )}
                               </td>
@@ -808,15 +808,15 @@ export default function ManagerInventory() {
                                 {isLow ? (
                                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border bg-red-50 text-red-700 border-red-200">
                                     <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                                    Ton kho thap
+                                    Tồn kho thấp
                                   </span>
                                 ) : isWarning ? (
                                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border bg-amber-50 text-amber-700 border-amber-200">
-                                    Sap het hang
+                                    Sắp hết hàng
                                   </span>
                                 ) : (
                                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border bg-emerald-50 text-emerald-700 border-emerald-200">
-                                    San sang
+                                    Sẵn sàng
                                   </span>
                                 )}
                               </td>
@@ -841,11 +841,11 @@ export default function ManagerInventory() {
                 {filteredItems.length > 0 && (
                   <div className="px-6 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
                     <span>
-                      Hien thi{" "}
+                      Hiển thị{" "}
                       <strong className="text-slate-700">
                         {filteredItems.length}
                       </strong>{" "}
-                      hang hoa
+                      hàng hóa
                     </span>
                     <span>
                       Kho:{" "}
@@ -869,11 +869,11 @@ export default function ManagerInventory() {
                       </div>
                       <div>
                         <h3 className="text-lg font-bold text-red-900">
-                          Canh bao ton kho thap ({lowStockItems.length} mat
-                          hang)
+                          Cảnh báo tồn kho thấp ({lowStockItems.length} mặt
+                          hàng)
                         </h3>
                         <p className="text-sm text-red-600">
-                          Cac hang hoa duoi 50 don vi can nhap kho gap
+                          Các hàng hóa dưới 50 đơn vị cần nhập kho gấp
                         </p>
                       </div>
                     </div>
@@ -881,7 +881,7 @@ export default function ManagerInventory() {
                       onClick={() => setShowInventoryInModal(true)}
                       className="px-5 py-2.5 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-red-500/20 whitespace-nowrap"
                     >
-                      Nhap kho khan cap
+                      Nhập kho khẩn cấp
                     </button>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -906,7 +906,7 @@ export default function ManagerInventory() {
                                 {item.itemName}
                               </p>
                               <p className="text-xs text-red-600 font-semibold">
-                                Con lai: {item.quantity} don vi
+                                Còn lại: {item.quantity} đơn vị
                               </p>
                             </div>
                           </div>
@@ -914,7 +914,7 @@ export default function ManagerInventory() {
                             onClick={() => setShowInventoryInModal(true)}
                             className="text-xs bg-slate-100 group-hover:bg-red-600 group-hover:text-white px-3 py-1.5 rounded-xl font-semibold transition-all"
                           >
-                            Nhap ngay
+                            Nhập ngay
                           </button>
                         </div>
                       );
@@ -926,8 +926,8 @@ export default function ManagerInventory() {
               {/* Footer */}
               <div className="mt-6 border-t border-slate-200 pt-5 text-center">
                 <p className="text-xs text-slate-400">
-                  2026 ReliefOps System · Warehouse Module v2.0 · Du lieu thoi
-                  gian thuc tu API
+                  2026 ReliefOps System · Warehouse Module v2.0 · Dữ liệu thời
+                  gian thực từ API
                 </p>
               </div>
             </>
@@ -935,11 +935,11 @@ export default function ManagerInventory() {
         </div>
       </div>
 
-      {/* MODAL: TAO KHO MOI */}
+      {/* MODAL: TẠO KHO MỚI */}
       <Modal
         open={showCreateWarehouseModal}
         onClose={() => setShowCreateWarehouseModal(false)}
-        title="Tao kho moi"
+        title="Tạo kho mới"
       >
         <form onSubmit={handleCreateWarehouse} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -956,11 +956,11 @@ export default function ManagerInventory() {
                   }))
                 }
                 className={inputClass}
-                placeholder="Nhap user ID"
+                placeholder="Nhập user ID"
               />
             </div>
             <div>
-              <label className={labelClass}>Trang thai *</label>
+              <label className={labelClass}>Trạng thái *</label>
               <select
                 required
                 value={createWarehouseForm.status}
@@ -972,15 +972,15 @@ export default function ManagerInventory() {
                 }
                 className={inputClass}
               >
-                <option value="ACTIVE">Hoat dong</option>
-                <option value="INACTIVE">Tam ngung</option>
-                <option value="LOCKED">Bi khoa</option>
+                <option value="ACTIVE">Hoạt động</option>
+                <option value="INACTIVE">Tạm ngưng</option>
+                <option value="LOCKED">Bị khóa</option>
               </select>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className={labelClass}>Ma tai nguyen (Resource ID)</label>
+              <label className={labelClass}>Mã tài nguyên (Resource ID)</label>
               <input
                 type="text"
                 value={createWarehouseForm.resourceId}
@@ -995,7 +995,7 @@ export default function ManagerInventory() {
               />
             </div>
             <div>
-              <label className={labelClass}>Ma nguon cung (Supply ID)</label>
+              <label className={labelClass}>Mã nguồn cung (Supply ID)</label>
               <input
                 type="text"
                 value={createWarehouseForm.supplyId}
@@ -1011,7 +1011,7 @@ export default function ManagerInventory() {
             </div>
           </div>
           <div>
-            <label className={labelClass}>Dia chi *</label>
+            <label className={labelClass}>Địa chỉ *</label>
             <input
               type="text"
               required
@@ -1023,12 +1023,12 @@ export default function ManagerInventory() {
                 }))
               }
               className={inputClass}
-              placeholder="VD: 123 Duong Le Loi, TP.HCM"
+              placeholder="VD: 123 Đường Lê Lợi, TP.HCM"
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className={labelClass}>Vi do (Latitude)</label>
+              <label className={labelClass}>Vĩ độ (Latitude)</label>
               <input
                 type="number"
                 step="any"
@@ -1044,7 +1044,7 @@ export default function ManagerInventory() {
               />
             </div>
             <div>
-              <label className={labelClass}>Kinh do (Longitude)</label>
+              <label className={labelClass}>Kinh độ (Longitude)</label>
               <input
                 type="number"
                 step="any"
@@ -1066,24 +1066,24 @@ export default function ManagerInventory() {
               onClick={() => setShowCreateWarehouseModal(false)}
               className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold text-sm transition-colors"
             >
-              Huy
+              Hủy
             </button>
             <button
               type="submit"
               disabled={submitting}
               className="flex-1 py-3 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 disabled:opacity-60 text-white rounded-xl font-semibold text-sm transition-all shadow-lg shadow-violet-500/20"
             >
-              {submitting ? "Dang tao..." : "Tao kho"}
+              {submitting ? "Đang tạo..." : "Tạo kho"}
             </button>
           </div>
         </form>
       </Modal>
 
-      {/* MODAL: NHAP KHO */}
+      {/* MODAL: NHẬP KHO */}
       <Modal
         open={showInventoryInModal}
         onClose={() => setShowInventoryInModal(false)}
-        title="Nhap hang vao kho"
+        title="Nhập hàng vào kho"
       >
         <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-700 font-medium flex items-center gap-2">
           <WarehouseIcon sx={{ fontSize: 16 }} />
@@ -1096,7 +1096,7 @@ export default function ManagerInventory() {
         </div>
         <form onSubmit={handleInventoryIn} className="space-y-4">
           <div>
-            <label className={labelClass}>Hang hoa *</label>
+            <label className={labelClass}>Hàng hóa *</label>
             <select
               required
               value={inventoryInForm.itemId}
@@ -1105,7 +1105,7 @@ export default function ManagerInventory() {
               }
               className={inputClass}
             >
-              <option value="">-- Chon hang hoa --</option>
+              <option value="">-- Chọn hàng hóa --</option>
               {catalogItems.map((item) => (
                 <option key={item.id} value={item.id}>
                   [{ITEM_TYPE_CONFIG[item.itemType]?.label || item.itemType}]{" "}
@@ -1116,12 +1116,12 @@ export default function ManagerInventory() {
             </select>
             {catalogItems.length === 0 && (
               <p className="text-xs text-amber-600 mt-1">
-                Chua co danh muc hang hoa. Vui long lien he Admin.
+                Chưa có danh mục hàng hóa. Vui lòng liên hệ Admin.
               </p>
             )}
           </div>
           <div>
-            <label className={labelClass}>So luong nhap *</label>
+            <label className={labelClass}>Số lượng nhập *</label>
             <input
               type="number"
               required
@@ -1131,7 +1131,7 @@ export default function ManagerInventory() {
                 setInventoryInForm((f) => ({ ...f, quantity: e.target.value }))
               }
               className={inputClass}
-              placeholder="Nhap so luong (> 0)"
+              placeholder="Nhập số lượng (> 0)"
             />
           </div>
           <div className="flex gap-3 pt-2">
@@ -1140,24 +1140,24 @@ export default function ManagerInventory() {
               onClick={() => setShowInventoryInModal(false)}
               className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold text-sm transition-colors"
             >
-              Huy
+              Hủy
             </button>
             <button
               type="submit"
               disabled={submitting}
               className="flex-1 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:opacity-60 text-white rounded-xl font-semibold text-sm transition-all shadow-lg shadow-emerald-500/20"
             >
-              {submitting ? "Dang nhap..." : "Xac nhan nhap kho"}
+              {submitting ? "Đang nhập..." : "Xác nhận nhập kho"}
             </button>
           </div>
         </form>
       </Modal>
 
-      {/* MODAL: XUAT KHO */}
+      {/* MODAL: XUẤT KHO */}
       <Modal
         open={showInventoryOutModal}
         onClose={() => setShowInventoryOutModal(false)}
-        title="Xuat hang khoi kho"
+        title="Xuất hàng khỏi kho"
       >
         <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-700 font-medium flex items-center gap-2">
           <WarehouseIcon sx={{ fontSize: 16 }} />
@@ -1170,7 +1170,7 @@ export default function ManagerInventory() {
         </div>
         <form onSubmit={handleInventoryOut} className="space-y-4">
           <div>
-            <label className={labelClass}>Hang hoa *</label>
+            <label className={labelClass}>Hàng hóa *</label>
             <select
               required
               value={inventoryOutForm.itemId}
@@ -1179,12 +1179,12 @@ export default function ManagerInventory() {
               }
               className={inputClass}
             >
-              <option value="">-- Chon hang hoa --</option>
+              <option value="">-- Chọn hàng hóa --</option>
               {inventoryData?.items?.map((item) => {
                 const typeConfig = getItemTypeConfig(item.itemId);
                 return (
                   <option key={item.itemId} value={item.itemId}>
-                    [{typeConfig?.label || "-"}] {item.itemName} - Ton:{" "}
+                    [{typeConfig?.label || "-"}] {item.itemName} - Tồn:{" "}
                     {item.quantity}
                   </option>
                 );
@@ -1192,7 +1192,7 @@ export default function ManagerInventory() {
             </select>
           </div>
           <div>
-            <label className={labelClass}>So luong xuat *</label>
+            <label className={labelClass}>Số lượng xuất *</label>
             <input
               type="number"
               required
@@ -1202,12 +1202,12 @@ export default function ManagerInventory() {
                 setInventoryOutForm((f) => ({ ...f, quantity: e.target.value }))
               }
               className={inputClass}
-              placeholder="Nhap so luong can xuat (> 0)"
+              placeholder="Nhập số lượng cần xuất (> 0)"
             />
           </div>
           <p className="text-xs text-slate-500 bg-slate-50 rounded-xl p-3 border border-slate-200">
-            He thong se kiem tra ton kho. Neu so luong yeu cau vuot qua ton kho,
-            thao tac se bi tu choi.
+            Hệ thống sẽ kiểm tra tồn kho. Nếu số lượng yêu cầu vượt quá tồn kho,
+            thao tác sẽ bị từ chối.
           </p>
           <div className="flex gap-3 pt-2">
             <button
@@ -1215,33 +1215,33 @@ export default function ManagerInventory() {
               onClick={() => setShowInventoryOutModal(false)}
               className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold text-sm transition-colors"
             >
-              Huy
+              Hủy
             </button>
             <button
               type="submit"
               disabled={submitting}
               className="flex-1 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 disabled:opacity-60 text-white rounded-xl font-semibold text-sm transition-all shadow-lg shadow-amber-500/20"
             >
-              {submitting ? "Dang xuat..." : "Xac nhan xuat kho"}
+              {submitting ? "Đang xuất..." : "Xác nhận xuất kho"}
             </button>
           </div>
         </form>
       </Modal>
 
-      {/* MODAL: PHAN PHOI CUU TRO */}
+      {/* MODAL: PHÂN PHỐI CỨU TRỢ */}
       <Modal
         open={showReliefDistModal}
         onClose={() => setShowReliefDistModal(false)}
-        title="Phan phoi hang cuu tro"
+        title="Phân phối hàng cứu trợ"
       >
         <form onSubmit={handleReliefDistribution} className="space-y-4">
           <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-700 font-medium">
-            Ghi nhan viec phan phoi hang hoa truc tiep den ho dan theo nhiem vu
-            cuu ho. Thao tac nay se tu dong giam ton kho tuong ung.
+            Ghi nhận việc phân phối hàng hóa trực tiếp đến hộ dân theo nhiệm vụ
+            cứu hộ. Thao tác này sẽ tự động giảm tồn kho tương ứng.
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className={labelClass}>ID Nhiem vu (Mission ID) *</label>
+              <label className={labelClass}>ID Nhiệm vụ (Mission ID) *</label>
               <input
                 type="number"
                 required
@@ -1254,11 +1254,11 @@ export default function ManagerInventory() {
                   }))
                 }
                 className={inputClass}
-                placeholder="Nhap mission ID"
+                placeholder="Nhập mission ID"
               />
             </div>
             <div>
-              <label className={labelClass}>ID Ton kho (Inventory ID) *</label>
+              <label className={labelClass}>ID Tồn kho (Inventory ID) *</label>
               <input
                 type="number"
                 required
@@ -1271,11 +1271,11 @@ export default function ManagerInventory() {
                   }))
                 }
                 className={inputClass}
-                placeholder="Nhap inventory ID"
+                placeholder="Nhập inventory ID"
               />
               {inventoryData?.items && inventoryData.items.length > 0 && (
                 <p className="text-xs text-slate-400 mt-1">
-                  Cac item trong kho:{" "}
+                  Các item trong kho:{" "}
                   {inventoryData.items
                     .map(
                       (i) => `${i.itemName}(id:${i.inventoryId || i.itemId})`,
@@ -1286,7 +1286,7 @@ export default function ManagerInventory() {
             </div>
           </div>
           <div>
-            <label className={labelClass}>So luong phan phoi *</label>
+            <label className={labelClass}>Số lượng phân phối *</label>
             <input
               type="number"
               required
@@ -1296,11 +1296,11 @@ export default function ManagerInventory() {
                 setReliefDistForm((f) => ({ ...f, quantity: e.target.value }))
               }
               className={inputClass}
-              placeholder="So luong (>= 0)"
+              placeholder="Số lượng (>= 0)"
             />
           </div>
           <div>
-            <label className={labelClass}>CCCD / Ma dinh danh ho dan *</label>
+            <label className={labelClass}>CCCD / Mã định danh hộ dân *</label>
             <input
               type="text"
               required
@@ -1333,7 +1333,7 @@ export default function ManagerInventory() {
               htmlFor="isConfirmed"
               className="text-sm text-slate-700 font-medium cursor-pointer"
             >
-              Ho dan da xac nhan nhan hang
+              Hộ dân đã xác nhận nhận hàng
             </label>
           </div>
           <div className="flex gap-3 pt-2">
@@ -1342,14 +1342,14 @@ export default function ManagerInventory() {
               onClick={() => setShowReliefDistModal(false)}
               className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold text-sm transition-colors"
             >
-              Huy
+              Hủy
             </button>
             <button
               type="submit"
               disabled={submitting}
               className="flex-1 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-60 text-white rounded-xl font-semibold text-sm transition-all shadow-lg shadow-blue-500/20"
             >
-              {submitting ? "Dang ghi nhan..." : "Xac nhan phan phoi"}
+              {submitting ? "Đang ghi nhận..." : "Xác nhận phân phối"}
             </button>
           </div>
         </form>

@@ -19,7 +19,48 @@ const reportService = {
     try {
       const response = await api.get("/reports/summary");
       if (response.data?.success) {
-        return { success: true, data: response.data.data };
+        const raw = response.data.data || {};
+
+        // Hỗ trợ đồng thời:
+        // 1) format nested cũ: { requests, missions, vehicles, impact }
+        // 2) format flat mới BE: { totalRequests, requestsCreated, ... }
+        const isFlatFormat =
+          raw.totalRequests !== undefined || raw.totalMissions !== undefined;
+
+        const normalized = isFlatFormat
+          ? {
+              requests: {
+                total: raw.totalRequests,
+                CREATED: raw.requestsCreated,
+                IN_PROGRESS: raw.requestsInProgress,
+                COMPLETED: raw.requestsCompleted,
+                CANCELLED: raw.requestsCancelled,
+              },
+              missions: {
+                total: raw.totalMissions,
+                PENDING: raw.missionsPending,
+                ASSIGNED: raw.missionsAssigned,
+                IN_PROGRESS: raw.missionsInProgress,
+                COMPLETED: raw.missionsCompleted,
+                CANCELLED: raw.missionsCancelled,
+              },
+              vehicles: {
+                total: raw.totalVehicles,
+                AVAILABLE: raw.vehiclesAvailable,
+                IN_USE: raw.vehiclesInUse,
+                MAINTENANCE: raw.vehiclesMaintenance,
+              },
+              impact: {
+                totalPeopleRescued: raw.totalPeopleRescued,
+              },
+              raw,
+            }
+          : {
+              ...raw,
+              raw,
+            };
+
+        return { success: true, data: normalized };
       }
       return {
         success: false,
