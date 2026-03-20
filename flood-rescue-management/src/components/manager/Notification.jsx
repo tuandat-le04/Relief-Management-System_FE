@@ -22,7 +22,7 @@ export default function Notification({
 
   useEffect(() => {
     setAlerts(initialAlerts || []);
-  }, [initialAlerts]);
+  }, [initialAlerts, isOpen]);
 
   if (!isOpen) return null;
 

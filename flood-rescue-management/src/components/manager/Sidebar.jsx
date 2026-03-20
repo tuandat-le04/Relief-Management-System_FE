@@ -32,16 +32,18 @@ export default function Sidebar() {
         {/* Navigation Menu */}
         <nav className="flex flex-col gap-1">
           <Link
-            to="/manager/dashboard"
+            to="/manager/teams"
             className={`group flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 hover:translate-x-1 ${
-              location.pathname === "/manager/dashboard"
+              location.pathname === "/manager/dashboard" ||
+              location.pathname === "/manager/teams"
                 ? "bg-gradient-to-r from-blue-100 via-blue-50 to-transparent border border-blue-300 text-blue-700 shadow-lg shadow-blue-200/50"
                 : "text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-transparent hover:border-gray-200"
             }`}
           >
             <div
               className={`flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-300 group-hover:scale-110 ${
-                location.pathname === "/manager/dashboard"
+                location.pathname === "/manager/dashboard" ||
+                location.pathname === "/manager/teams"
                   ? "bg-blue-200 group-hover:bg-blue-300"
                   : "bg-gray-200 group-hover:bg-gray-300"
               }`}
@@ -50,7 +52,7 @@ export default function Sidebar() {
                 <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" />
               </svg>
             </div>
-            <span className="text-sm font-semibold">Tổng quan</span>
+            <span className="text-sm font-semibold">Quản lý đội nhóm</span>
           </Link>
 
           <Link

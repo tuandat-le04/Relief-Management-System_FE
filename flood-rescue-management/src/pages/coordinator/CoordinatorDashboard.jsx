@@ -5,7 +5,6 @@ import StatsCards from "../../components/coordinator/StatsCards";
 import SearchAndFilter from "../../components/coordinator/SearchAndFilter";
 import RequestCard from "../../components/coordinator/RequestCard";
 import MapSection from "../../components/coordinator/MapSection";
-import EmergencyFAB from "../../components/coordinator/EmergencyFAB";
 import CancelRequestModal from "../../components/coordinator/CancelRequestModal";
 import ClassifyRequestModal from "../../components/coordinator/ClassifyRequestModal";
 import RequestDetailModal from "../../components/coordinator/RequestDetailModal";
@@ -432,8 +431,6 @@ const CoordinatorDashboard = () => {
 
         <MapSection mapRef={mapRef} />
       </main>
-
-      <EmergencyFAB />
 
       {/* Modals */}
       <CancelRequestModal

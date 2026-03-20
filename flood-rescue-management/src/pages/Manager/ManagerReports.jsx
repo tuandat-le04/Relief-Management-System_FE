@@ -137,14 +137,27 @@ export default function ManagerReports() {
   const impact = summaryData?.impact || {};
 
   const requestTotal = toNumber(requests.total);
+  const requestCreated = toNumber(requests.CREATED);
+  const requestInProgress = toNumber(requests.IN_PROGRESS);
   const requestCompleted = toNumber(requests.COMPLETED);
+  const requestRejected = toNumber(
+    requests.CANCELLED ??
+      requests.CANCELED ??
+      requests.REJECTED ??
+      requests.DECLINED,
+  );
 
   const missionTotal = toNumber(missions.total);
   const missionCompleted = toNumber(missions.COMPLETED);
   const missionInProgress = toNumber(missions.IN_PROGRESS);
   const missionAssigned = toNumber(missions.ASSIGNED);
   const missionPending = toNumber(missions.PENDING);
-  const missionCancelled = toNumber(missions.CANCELLED);
+  const missionRejected = toNumber(
+    missions.CANCELLED ??
+      missions.CANCELED ??
+      missions.REJECTED ??
+      missions.DECLINED,
+  );
 
   const vehicleTotal = toNumber(vehicles.total);
   const vehicleAvailable = toNumber(vehicles.AVAILABLE);
@@ -160,6 +173,37 @@ export default function ManagerReports() {
   const requestCompletionRate = toPercent(requestCompleted, requestTotal);
   const missionCompletionRate = toPercent(missionCompleted, missionTotal);
   const vehicleReadinessRate = toPercent(vehicleAvailable, vehicleTotal);
+
+  const requestStatusData = [
+    {
+      name: "Created",
+      label: "Chờ xử lý",
+      count: requestCreated,
+      value: toPercent(requestCreated, requestTotal),
+      color: "bg-slate-500",
+    },
+    {
+      name: "InProgress",
+      label: "Đang xử lý",
+      count: requestInProgress,
+      value: toPercent(requestInProgress, requestTotal),
+      color: "bg-blue-600",
+    },
+    {
+      name: "Completed",
+      label: "Hoàn thành",
+      count: requestCompleted,
+      value: toPercent(requestCompleted, requestTotal),
+      color: "bg-emerald-600",
+    },
+    {
+      name: "Rejected",
+      label: "Từ chối",
+      count: requestRejected,
+      value: toPercent(requestRejected, requestTotal),
+      color: "bg-red-500",
+    },
+  ];
 
   const missionStatusData = [
     {
@@ -191,10 +235,10 @@ export default function ManagerReports() {
       color: "bg-emerald-600",
     },
     {
-      name: "Cancelled",
-      label: "Hủy",
-      count: missionCancelled,
-      value: toPercent(missionCancelled, missionTotal),
+      name: "Rejected",
+      label: "Từ chối",
+      count: missionRejected,
+      value: toPercent(missionRejected, missionTotal),
       color: "bg-red-500",
     },
   ];
@@ -601,6 +645,41 @@ export default function ManagerReports() {
                   ))}
                 </div>
               </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200/60 hover:shadow-lg transition-all duration-300 mb-8">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="font-bold text-slate-900 text-lg flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/20">
+                  <ShowChartIcon sx={{ fontSize: 20 }} />
+                </div>
+                Phân bổ yêu cầu theo trạng thái
+              </h3>
+              <span className="text-xs text-slate-500 font-medium">
+                Tổng: {requestTotal.toLocaleString("vi-VN")} yêu cầu
+              </span>
+            </div>
+
+            <div className="space-y-4 h-56 overflow-auto pr-1">
+              {requestStatusData.map((item) => (
+                <div key={item.name} className="space-y-1.5">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-semibold text-slate-700">
+                      {item.label}
+                    </span>
+                    <span className="text-slate-600">
+                      {item.count} yêu cầu ({item.value}%)
+                    </span>
+                  </div>
+                  <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                      className={`${item.color} h-full rounded-full transition-all duration-500`}
+                      style={{ width: `${item.value}%` }}
+                    ></div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 

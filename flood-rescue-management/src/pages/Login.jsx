@@ -65,7 +65,7 @@ const Login = () => {
           ADMIN: "/admin/dashboard",
           RESCUE_COORDINATOR: "/coordinator/dashboard",
           RESCUE_TEAM: "/rescue-team/dashboard",
-          MANAGER: "/manager/dashboard",
+          MANAGER: "/manager/teams",
           CITIZEN: "/citizen/dashboard",
         };
 

@@ -17,7 +17,7 @@ const PublicRoute = ({ children }) => {
       case "RESCUE_COORDINATOR":
         return <Navigate to="/coordinator/dashboard" replace />;
       case "MANAGER":
-        return <Navigate to="/manager/dashboard" replace />;
+        return <Navigate to="/manager/teams" replace />;
       case "CITIZEN":
         return <Navigate to="/citizen/dashboard" replace />;
       case "RESCUE_TEAM":

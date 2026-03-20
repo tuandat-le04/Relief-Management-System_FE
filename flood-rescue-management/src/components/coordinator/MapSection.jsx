@@ -7,7 +7,7 @@ const MapSection = ({ mapRef }) => {
       <div ref={mapRef} className="absolute inset-0 w-full h-full" />
 
       {/* Map Overlay */}
-      <div className="absolute inset-0 z-10 p-8 flex flex-col justify-between pointer-events-none">
+      <div className="absolute inset-0 z-10 p-8 flex flex-col pointer-events-none">
         {/* Top Row */}
         <div className="flex justify-between items-start">
           {/* Legend */}
@@ -37,53 +37,6 @@ const MapSection = ({ mapRef }) => {
                   Điểm tập kết an toàn
                 </span>
               </div>
-            </div>
-          </div>
-
-          {/* Map Controls */}
-          <div className="flex flex-col gap-2 pointer-events-auto">
-            <div className="bg-white/95 backdrop-blur-md p-1 rounded-lg border border-slate-200 shadow-lg flex flex-col">
-              <button className="p-2 text-slate-700 hover:bg-slate-100 rounded-md transition-colors">
-                <span className="material-symbols-outlined">add</span>
-              </button>
-              <div className="h-px bg-slate-200 mx-2"></div>
-              <button className="p-2 text-slate-700 hover:bg-slate-100 rounded-md transition-colors">
-                <span className="material-symbols-outlined">remove</span>
-              </button>
-            </div>
-            <button className="bg-white/95 backdrop-blur-md p-3 rounded-lg border border-slate-200 shadow-lg text-slate-700 hover:bg-slate-100 transition-colors">
-              <span className="material-symbols-outlined">layers</span>
-            </button>
-            <button className="bg-white/95 backdrop-blur-md p-3 rounded-lg border border-slate-200 shadow-lg text-slate-700 hover:bg-slate-100 transition-colors">
-              <span className="material-symbols-outlined">my_location</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Bottom Status Bar */}
-        <div className="flex justify-center w-full">
-          <div className="bg-white/95 backdrop-blur-md px-6 py-3 rounded-full border border-slate-200 shadow-lg flex items-center gap-6 pointer-events-auto">
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold text-slate-500 uppercase">
-                Mực nước
-              </span>
-              <span className="text-sm font-bold text-red-600">+1.2m</span>
-            </div>
-            <div className="w-px h-4 bg-slate-300"></div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold text-slate-500 uppercase">
-                Gió
-              </span>
-              <span className="text-sm font-bold text-slate-900">45 km/h</span>
-            </div>
-            <div className="w-px h-4 bg-slate-300"></div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold text-slate-500 uppercase">
-                Trạng thái liên lạc
-              </span>
-              <span className="text-sm font-bold text-green-600">
-                Tốt (85%)
-              </span>
             </div>
           </div>
         </div>
