@@ -37,24 +37,6 @@ const Header = () => {
             >
               Tổng quan
             </a>
-            <a
-              className="text-slate-500 text-sm font-medium hover:text-blue-600 transition-colors"
-              href="#"
-            >
-              Bản đồ nhiệt
-            </a>
-            <a
-              className="text-slate-500 text-sm font-medium hover:text-blue-600 transition-colors"
-              href="#"
-            >
-              Đội cứu hộ (42)
-            </a>
-            <a
-              className="text-slate-500 text-sm font-medium hover:text-blue-600 transition-colors"
-              href="#"
-            >
-              Báo cáo nhanh
-            </a>
           </nav>
         </div>
 
@@ -77,13 +59,6 @@ const Header = () => {
                 groups
               </span>
               <span className="hidden lg:inline">Theo dõi đội</span>
-            </button>
-
-            <button className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors">
-              <span className="material-symbols-outlined">notifications</span>
-            </button>
-            <button className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors">
-              <span className="material-symbols-outlined">settings</span>
             </button>
           </div>
 

@@ -1,16 +1,17 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import authService from "../../services/authService";
 import CitizenMapGoong from "../../components/citizen/CitizenMapGoong";
-import rescueRequestService from "../../services/rescueRequestService";
-import avatarUser from "../../assets/images/avatar-user.png";
+import notificationService from "../../services/notificationService";
 
 const CitizenDashboard = () => {
   const navigate = useNavigate();
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
-  const [isLoadingRequests, setIsLoadingRequests] = useState(false);
-  const [userRequests, setUserRequests] = useState([]);
-  const [requestError, setRequestError] = useState("");
+  const [isLoadingNotifications, setIsLoadingNotifications] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [notificationsError, setNotificationsError] = useState("");
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [readingIds, setReadingIds] = useState(() => new Set());
 
   const currentUser = authService.getCurrentUser();
   const displayName =
@@ -18,79 +19,107 @@ const CitizenDashboard = () => {
     currentUser?.username ||
     currentUser?.name ||
     "Người dùng";
-  const avatarUrl = currentUser?.avatar || avatarUser;
+  const avatarUrl =
+    currentUser?.avatar ||
+    "https://lh3.googleusercontent.com/aida-public/AB6AXuC5tF_1eIvvrD83eWRAoe-3d96B0aXaXs0jqAWxqyswKI8LBiqyVvXHOnhHzw7Lo0qP_mmp2JQP3ThRBAd0GohkAV439UpMYlBTQbLcWRY3WSY9C2s9jILWHGFq-ZDjSsiagrlYlpzMYlzr6tn60wG23atqijkSQSWYuGpd0_vlJ47riljO8rivoPHnrBImgTd_4MZ8AKU-xUIEDckE7iwA8Y3sEa_Fpguo4ZwL_MDTXnAITVBYEaXXfxKQb098GdXmTcTnamZUeU0";
 
-  const getStatusConfig = (status) => {
-    switch (status) {
-      case "CREATED":
-        return {
-          label: "Đã gửi",
+  const getReadStatusConfig = (isRead) =>
+    isRead
+      ? {
+          label: "Đã đọc",
           className:
-            "bg-gray-100 text-gray-800 border border-gray-200 rounded-full px-2.5 py-0.5 text-xs font-semibold",
-        };
-      case "IN_PROGRESS":
-        return {
-          label: "Đang xử lý",
+            "bg-gray-100 text-gray-700 border border-gray-200 rounded-full px-2.5 py-0.5 text-xs font-semibold",
+        }
+      : {
+          label: "Chưa đọc",
           className:
             "bg-blue-50 text-blue-700 border border-blue-200 rounded-full px-2.5 py-0.5 text-xs font-semibold",
         };
-      case "COMPLETED":
-        return {
-          label: "Đã hoàn thành",
-          className:
-            "bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-2.5 py-0.5 text-xs font-semibold",
-        };
-      case "CANCELLED":
-        return {
-          label: "Đã hủy",
-          className:
-            "bg-red-50 text-red-700 border border-red-200 rounded-full px-2.5 py-0.5 text-xs font-semibold",
-        };
-      default:
-        return {
-          label: status || "Không rõ",
-          className:
-            "bg-gray-100 text-gray-800 border border-gray-200 rounded-full px-2.5 py-0.5 text-xs font-semibold",
-        };
-    }
-  };
 
   const handleLogout = () => {
     authService.logout();
     navigate("/login");
   };
 
-  const handleOpenNotifications = async () => {
+  const fetchUnreadCount = async () => {
     try {
-      setIsNotificationOpen(true);
-      setRequestError("");
-      setIsLoadingRequests(true);
-      const user = currentUser;
-      const userId = user?.id ?? user?.userId ?? null;
+      const response = await notificationService.getUnreadNotifications();
 
-      if (!userId) {
-        setRequestError("Không xác định được người dùng hiện tại.");
-        setUserRequests([]);
-        setIsLoadingRequests(false);
+      if (response.success) {
+        setUnreadCount((response.data || []).length);
+      } else {
+        setUnreadCount(0);
+      }
+    } catch {
+      setUnreadCount(0);
+    }
+  };
+
+  const fetchNotificationsList = async () => {
+    try {
+      setNotificationsError("");
+      setIsLoadingNotifications(true);
+      const response = await notificationService.getNotifications();
+
+      if (response.success) {
+        setNotifications(response.data || []);
+      } else {
+        setNotifications([]);
+        setNotificationsError(response.error || "Không thể tải thông báo.");
+      }
+    } catch (error) {
+      console.error("Error loading notifications:", error);
+      setNotifications([]);
+      setNotificationsError(
+        error?.response?.data?.message ||
+          error?.message ||
+          "Không thể tải thông báo.",
+      );
+    } finally {
+      setIsLoadingNotifications(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUnreadCount();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleOpenNotifications = async () => {
+    setIsNotificationOpen(true);
+    await Promise.all([fetchUnreadCount(), fetchNotificationsList()]);
+  };
+
+  const handleMarkAsRead = async (id) => {
+    if (!id) return;
+    if (readingIds.has(id)) return;
+
+    const current = notifications.find((n) => n.id === id);
+    if (current?.isRead) return;
+
+    const next = new Set(readingIds);
+    next.add(id);
+    setReadingIds(next);
+
+    try {
+      const response = await notificationService.markAsRead(id);
+      if (!response.success) {
+        setNotificationsError(response.error || "Không thể đánh dấu đã đọc.");
         return;
       }
 
-      const response = await rescueRequestService.getRequestsByUser(userId);
-
-      if (response.success) {
-        setUserRequests(response.data || []);
-      } else {
-        setRequestError(response.error || "Không thể tải trạng thái yêu cầu.");
-      }
-    } catch (error) {
-      console.error("Error loading user requests:", error);
-      setRequestError(
-        error.response?.data?.message ||
-          error.message ||
-          "Không thể tải trạng thái yêu cầu.",
+      setNotifications((prev) =>
+        prev.map((n) =>
+          n.id === id ? { ...n, ...(response.data || {}), isRead: true } : n,
+        ),
       );
+      setUnreadCount((prev) => Math.max(0, prev - 1));
     } finally {
-      setIsLoadingRequests(false);
+      setReadingIds((prev) => {
+        const copy = new Set(prev);
+        copy.delete(id);
+        return copy;
+      });
     }
   };
 
@@ -114,14 +143,29 @@ const CitizenDashboard = () => {
       <header className="bg-white/95 backdrop-blur-md border-b border-gray-200 dark:bg-gray-900/95 dark:border-gray-800 px-4 md:px-6 py-3 flex items-center justify-between z-50 relative shadow-sm h-16">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-3">
-            <div className="resq-brand-mark-sm">
-              <span className="material-symbols-outlined text-xl">
-                emergency
-              </span>
+            <div className="size-9 text-primary bg-primary/10 p-1.5 rounded-lg">
+              <svg
+                fill="none"
+                viewBox="0 0 48 48"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  clipRule="evenodd"
+                  d="M24 18.4228L42 11.475V34.3663C42 34.7796 41.7457 35.1504 41.3601 35.2992L24 42V18.4228Z"
+                  fill="currentColor"
+                  fillRule="evenodd"
+                />
+                <path
+                  clipRule="evenodd"
+                  d="M24 8.18819L33.4123 11.574L24 15.2071L14.5877 11.574L24 8.18819ZM9 15.8487L21 20.4805V37.6263L9 32.9945V15.8487ZM27 37.6263V20.4805L39 15.8487V32.9945L27 37.6263ZM25.354 2.29885C24.4788 1.98402 23.5212 1.98402 22.646 2.29885L4.98454 8.65208C3.7939 9.08038 3 10.2097 3 11.475V34.3663C3 36.0196 4.01719 37.5026 5.55962 38.098L22.9197 44.7987C23.6149 45.0671 24.3851 45.0671 25.0803 44.7987L42.4404 38.098C43.9828 37.5026 45 36.0196 45 34.3663V11.475C45 10.2097 44.2061 9.08038 43.0155 8.65208L25.354 2.29885Z"
+                  fill="currentColor"
+                  fillRule="evenodd"
+                />
+              </svg>
             </div>
             <div>
-              <h1 className="resq-brand-title text-base md:text-lg leading-none dark:text-white">
-                RESQ
+              <h1 className="text-gray-900 dark:text-white text-base md:text-lg font-black leading-none tracking-tight">
+                CỨU TRỢ THIÊN TAI
               </h1>
               <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mt-0.5">
                 Cổng thông tin quốc gia
@@ -152,7 +196,9 @@ const CitizenDashboard = () => {
               <span className="material-symbols-outlined text-[22px]">
                 notifications
               </span>
-              <span className="absolute top-1.5 right-1.5 size-2.5 bg-sos-red rounded-full border-2 border-white dark:border-gray-900 animate-pulse"></span>
+              {unreadCount > 0 && (
+                <span className="absolute top-1.5 right-1.5 size-2.5 bg-sos-red rounded-full border-2 border-white dark:border-gray-900 animate-pulse"></span>
+              )}
             </button>
             <div className="flex items-center gap-2">
               <button className="flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 p-1 pl-1 pr-3 rounded-full transition-all border border-transparent hover:border-gray-200 dark:hover:border-gray-700 group">
@@ -259,10 +305,10 @@ const CitizenDashboard = () => {
             <div className="flex items-center justify-between mb-3">
               <div>
                 <h2 className="text-base md:text-lg font-bold text-gray-900 dark:text-white">
-                  Trạng thái yêu cầu của bạn
+                  Thông báo của bạn
                 </h2>
                 <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
-                  Bao gồm các yêu cầu cứu hộ và nhu yếu phẩm gần đây.
+                  Các thông báo gần đây từ hệ thống.
                 </p>
               </div>
               <button
@@ -275,43 +321,57 @@ const CitizenDashboard = () => {
             </div>
 
             <div className="max-h-80 overflow-y-auto space-y-3 mt-2">
-              {isLoadingRequests && (
+              {isLoadingNotifications && (
                 <p className="text-sm text-gray-600 dark:text-gray-300">
                   Đang tải dữ liệu...
                 </p>
               )}
 
-              {!isLoadingRequests && requestError && (
-                <p className="text-sm text-red-600">{requestError}</p>
+              {!isLoadingNotifications && notificationsError && (
+                <p className="text-sm text-red-600">{notificationsError}</p>
               )}
 
-              {!isLoadingRequests &&
-                !requestError &&
-                (userRequests.length === 0 ? (
+              {!isLoadingNotifications &&
+                !notificationsError &&
+                (notifications.length === 0 ? (
                   <p className="text-sm text-gray-600 dark:text-gray-300">
-                    Bạn chưa gửi yêu cầu nào hoặc không tìm thấy dữ liệu.
+                    Bạn chưa có thông báo nào.
                   </p>
                 ) : (
-                  userRequests.map((req) => {
-                    const statusCfg = getStatusConfig(req.status);
+                  notifications.map((noti) => {
+                    const statusCfg = getReadStatusConfig(noti.isRead);
+                    const isUpdating = readingIds.has(noti.id);
                     return (
                       <div
-                        key={req.id}
-                        className="border border-gray-200 dark:border-gray-700 rounded-xl p-3 text-sm bg-gray-50/70 dark:bg-gray-800/60"
+                        key={noti.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => handleMarkAsRead(noti.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            handleMarkAsRead(noti.id);
+                          }
+                        }}
+                        className={`border border-gray-200 dark:border-gray-700 rounded-xl p-3 text-sm bg-gray-50/70 dark:bg-gray-800/60 transition-colors ${
+                          noti.isRead
+                            ? "opacity-75"
+                            : "hover:bg-gray-100/70 dark:hover:bg-gray-800 cursor-pointer"
+                        }`}
                       >
                         <div className="flex items-center justify-between mb-1.5">
                           <p className="font-semibold text-gray-900 dark:text-white">
-                            {req.type}
+                            Thông báo
                           </p>
                           <span className={statusCfg.className}>
-                            {statusCfg.label}
+                            {isUpdating ? "Đang cập nhật..." : statusCfg.label}
                           </span>
                         </div>
                         <p className="text-xs text-gray-600 dark:text-gray-300 line-clamp-2">
-                          {req.description || "Không có mô tả chi tiết."}
+                          {noti.message || "(Không có nội dung)"}
                         </p>
                         <p className="mt-1 text-[11px] text-gray-500">
-                          Gửi {req.time}
+                          {noti.time ? `Gửi ${noti.time}` : ""}
                         </p>
                       </div>
                     );

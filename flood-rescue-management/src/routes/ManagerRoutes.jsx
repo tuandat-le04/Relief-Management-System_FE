@@ -1,17 +1,21 @@
 import React from "react";
 // import ProtectedRoute from "../components/ProtectedRoute"; // Tạm thời comment để xem preview
-import ManagerDashboard from "../pages/Manager/ManagerDashboard";
+import ManagerTeamManagement from "../pages/Manager/ManagerTeamManagement";
 import ManagerVehicle from "../pages/Manager/ManagerVehicle";
 import ManagerInventory from "../pages/Manager/ManagerInventory";
 import ManagerReports from "../pages/Manager/ManagerReports";
 
 const ManagerRoutes = [
   {
+    path: "/manager/teams",
+    element: <ManagerTeamManagement />, // Route chính: quản lý đội nhóm
+  },
+  {
     path: "/manager/dashboard",
-    element: <ManagerDashboard />, // Tạm thời bỏ ProtectedRoute để xem preview
+    element: <ManagerTeamManagement />, // Alias giữ tương thích đường dẫn cũ
     // element: (
     //   <ProtectedRoute allowedRoles={["manager"]}>
-    //     <ManagerDashboard />
+    //     <ManagerTeamManagement />
     //   </ProtectedRoute>
     // ),
   },

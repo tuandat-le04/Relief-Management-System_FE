@@ -4,6 +4,74 @@ import api from "./api";
 // Theo API.md §2.1 — API Dashboard Summary chuyên biệt
 // Quyền: ADMIN, MANAGER
 
+const pickFirstDefined = (...values) =>
+  values.find((v) => v !== undefined && v !== null);
+
+const normalizeDashboardSummary = (raw) => {
+  const requests = raw?.requests || {};
+  const missions = raw?.missions || {};
+  const vehicles = raw?.vehicles || {};
+  const impact = raw?.impact || {};
+
+  return {
+    requests: {
+      total: pickFirstDefined(raw.totalRequests, requests.total),
+      CREATED: pickFirstDefined(raw.requestsCreated, requests.CREATED),
+      IN_PROGRESS: pickFirstDefined(
+        raw.requestsInProgress,
+        requests.IN_PROGRESS,
+      ),
+      COMPLETED: pickFirstDefined(raw.requestsCompleted, requests.COMPLETED),
+      CANCELLED: pickFirstDefined(
+        raw.requestsCancelled,
+        raw.requestsCanceled,
+        raw.requestsRejected,
+        raw.requestsDeclined,
+        requests.CANCELLED,
+        requests.CANCELED,
+        requests.REJECTED,
+        requests.DECLINED,
+      ),
+    },
+    missions: {
+      total: pickFirstDefined(raw.totalMissions, missions.total),
+      PENDING: pickFirstDefined(raw.missionsPending, missions.PENDING),
+      ASSIGNED: pickFirstDefined(raw.missionsAssigned, missions.ASSIGNED),
+      IN_PROGRESS: pickFirstDefined(
+        raw.missionsInProgress,
+        missions.IN_PROGRESS,
+      ),
+      COMPLETED: pickFirstDefined(raw.missionsCompleted, missions.COMPLETED),
+      CANCELLED: pickFirstDefined(
+        raw.missionsCancelled,
+        raw.missionsCanceled,
+        raw.missionsRejected,
+        raw.missionsDeclined,
+        missions.CANCELLED,
+        missions.CANCELED,
+        missions.REJECTED,
+        missions.DECLINED,
+      ),
+    },
+    vehicles: {
+      total: pickFirstDefined(raw.totalVehicles, vehicles.total),
+      AVAILABLE: pickFirstDefined(raw.vehiclesAvailable, vehicles.AVAILABLE),
+      IN_USE: pickFirstDefined(raw.vehiclesInUse, vehicles.IN_USE),
+      MAINTENANCE: pickFirstDefined(
+        raw.vehiclesMaintenance,
+        vehicles.MAINTENANCE,
+      ),
+    },
+    impact: {
+      totalPeopleRescued: pickFirstDefined(
+        raw.totalPeopleRescued,
+        impact.totalPeopleRescued,
+      ),
+    },
+    raw,
+  };
+};
+
 const reportService = {
   /**
    * Lấy toàn bộ dữ liệu thống kê cho Dashboard trong 1 lần gọi duy nhất.
@@ -21,44 +89,7 @@ const reportService = {
       if (response.data?.success) {
         const raw = response.data.data || {};
 
-        // Hỗ trợ đồng thời:
-        // 1) format nested cũ: { requests, missions, vehicles, impact }
-        // 2) format flat mới BE: { totalRequests, requestsCreated, ... }
-        const isFlatFormat =
-          raw.totalRequests !== undefined || raw.totalMissions !== undefined;
-
-        const normalized = isFlatFormat
-          ? {
-              requests: {
-                total: raw.totalRequests,
-                CREATED: raw.requestsCreated,
-                IN_PROGRESS: raw.requestsInProgress,
-                COMPLETED: raw.requestsCompleted,
-                CANCELLED: raw.requestsCancelled,
-              },
-              missions: {
-                total: raw.totalMissions,
-                PENDING: raw.missionsPending,
-                ASSIGNED: raw.missionsAssigned,
-                IN_PROGRESS: raw.missionsInProgress,
-                COMPLETED: raw.missionsCompleted,
-                CANCELLED: raw.missionsCancelled,
-              },
-              vehicles: {
-                total: raw.totalVehicles,
-                AVAILABLE: raw.vehiclesAvailable,
-                IN_USE: raw.vehiclesInUse,
-                MAINTENANCE: raw.vehiclesMaintenance,
-              },
-              impact: {
-                totalPeopleRescued: raw.totalPeopleRescued,
-              },
-              raw,
-            }
-          : {
-              ...raw,
-              raw,
-            };
+        const normalized = normalizeDashboardSummary(raw);
 
         return { success: true, data: normalized };
       }
