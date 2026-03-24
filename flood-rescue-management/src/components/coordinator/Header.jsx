@@ -25,7 +25,9 @@ const Header = () => {
               </span>
             </div>
             <div>
-              <h1 className="resq-brand-title text-lg leading-tight">ResQ</h1>
+              <h1 className="resq-brand-title text-lg leading-tight">
+                CỨU TRỢ THIÊN TAI
+              </h1>
               <p className="resq-brand-subtitle">Điều phối cứu hộ</p>
             </div>
           </div>

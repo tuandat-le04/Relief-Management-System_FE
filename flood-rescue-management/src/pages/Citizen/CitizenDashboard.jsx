@@ -176,12 +176,6 @@ const CitizenDashboard = () => {
 
         <div className="flex items-center gap-4 md:gap-6">
           <nav className="hidden md:flex items-center gap-6 text-sm font-semibold text-gray-600 dark:text-gray-400">
-            <Link to="#" className="hover:text-primary transition-colors">
-              Tin tức
-            </Link>
-            <Link to="#" className="hover:text-primary transition-colors">
-              Hướng dẫn
-            </Link>
             <Link to="#" className="text-primary">
               Bản đồ
             </Link>

@@ -255,6 +255,7 @@ const RescueTeamDashboard = () => {
   const [request, setRequest] = useState(null);
   const [mission, setMission] = useState(null);
   const [rescueTeamId, setRescueTeamId] = useState(null);
+  const [rescueTeamName, setRescueTeamName] = useState("");
   const [goongMap, setGoongMap] = useState(null);
   const [startingNavigation, setStartingNavigation] = useState(false);
   const [lastUpdatedAt, setLastUpdatedAt] = useState(Date.now());
@@ -432,6 +433,16 @@ const RescueTeamDashboard = () => {
           user?.rescueTeam?.id ??
           null;
 
+        const loadedRescueTeamName =
+          assignment.rescueTeamName ??
+          assignment.rescueTeam?.name ??
+          assignment.rescueTeam?.rescueTeamName ??
+          user?.rescueTeamName ??
+          user?.teamName ??
+          user?.rescueTeam?.name ??
+          user?.rescueTeam?.rescueTeamName ??
+          "";
+
         // Gọi API chi tiết rescue request để lấy SĐT + tình trạng/ghi chú
         const detailRes = await rescueRequestService.getRequestById(requestId);
         const detail = detailRes.success ? detailRes.data : null;
@@ -498,6 +509,7 @@ const RescueTeamDashboard = () => {
         setRequest(loadedRequest);
         setMission(missionData);
         setRescueTeamId(loadedRescueTeamId);
+        setRescueTeamName(String(loadedRescueTeamName || ""));
         setProgressStep(nextStep);
         setRouteSummary(null);
         setNavigationActive(false);
@@ -568,6 +580,16 @@ const RescueTeamDashboard = () => {
           user?.teamID ??
           user?.rescueTeam?.id ??
           null;
+
+        const loadedRescueTeamName =
+          assignment.rescueTeamName ??
+          assignment.rescueTeam?.name ??
+          assignment.rescueTeam?.rescueTeamName ??
+          user?.rescueTeamName ??
+          user?.teamName ??
+          user?.rescueTeam?.name ??
+          user?.rescueTeam?.rescueTeamName ??
+          "";
         const detailRes = await rescueRequestService.getRequestById(requestId);
         const detail = detailRes.success ? detailRes.data : null;
 
@@ -581,6 +603,7 @@ const RescueTeamDashboard = () => {
           status: effectiveMissionStatus || assignment.mission?.status,
         });
         setRescueTeamId(loadedRescueTeamId);
+        setRescueTeamName(String(loadedRescueTeamName || ""));
         setRequest((prev) => ({
           ...(prev || {}),
           ...(detail || {}),
@@ -899,6 +922,18 @@ const RescueTeamDashboard = () => {
     );
   })();
 
+  const effectiveRescueTeamNameForUi = (() => {
+    const currentUser = authService.getCurrentUser();
+    const candidate =
+      rescueTeamName ||
+      currentUser?.rescueTeamName ||
+      currentUser?.teamName ||
+      currentUser?.rescueTeam?.name ||
+      currentUser?.rescueTeam?.rescueTeamName ||
+      "";
+    return String(candidate || "").trim();
+  })();
+
   const canStartNavigation =
     !loading &&
     !startingNavigation &&
@@ -931,7 +966,7 @@ const RescueTeamDashboard = () => {
                 Cứu Hộ VN
               </h2>
               <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">
-                Team Alpha-1
+                {effectiveRescueTeamNameForUi || "—"}
               </p>
             </div>
           </div>
@@ -966,10 +1001,15 @@ const RescueTeamDashboard = () => {
         <aside className="hidden lg:flex flex-col w-72 border-r border-[#e5e7eb] dark:border-[#374151] bg-white dark:bg-[#1c1e22] p-4 gap-6 z-20 shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
           <div className="px-2">
             <h1 className="text-[#131416] dark:text-white text-xl font-black mb-1">
-              Đội Cứu Hộ 01
+              {effectiveRescueTeamIdForUi !== null &&
+              effectiveRescueTeamIdForUi !== undefined
+                ? `Đội Cứu Hộ ${effectiveRescueTeamIdForUi}`
+                : "Đội Cứu Hộ"}
             </h1>
             <p className="text-sm text-gray-500 font-medium">
-              Khu vực: Quận 1 - Bình Thạnh
+              {effectiveRescueTeamNameForUi
+                ? `Khu vực: ${effectiveRescueTeamNameForUi}`
+                : "Khu vực: —"}
             </p>
           </div>
           <nav className="flex flex-col gap-2 flex-1">
