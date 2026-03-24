@@ -1,15 +1,37 @@
 import api from "./api";
 import { getTimeAgo } from "./rescueRequestService";
 
+const localizeStatusTokens = (value) => {
+  const text = String(value ?? "");
+  if (!text) return "";
+
+  // Normalize common backend enums inside human-readable message strings.
+  // Example: "status: IN_PROGRESS" -> "status: Đang thực hiện"
+  const replacements = [
+    { re: /\bIN[\s_-]?PROGRESS\b/gi, vi: "Đang thực hiện" },
+    { re: /\bPENDING\b/gi, vi: "Đang chờ" },
+    { re: /\bASSIGNED\b/gi, vi: "Đã phân công" },
+    { re: /\bARRIVED\b/gi, vi: "Đã đến nơi" },
+    { re: /\bCOMPLETED\b/gi, vi: "Hoàn thành" },
+    { re: /\bCANCELLED\b/gi, vi: "Đã hủy" },
+    { re: /\bFAILED\b/gi, vi: "Thất bại" },
+    { re: /\bDECLINED\b/gi, vi: "Từ chối" },
+  ];
+
+  return replacements.reduce((acc, { re, vi }) => acc.replace(re, vi), text);
+};
+
 const normalizeNotifications = (items) => {
   if (!Array.isArray(items)) return [];
   return items
     .map((n) => {
       const createdAt = n?.createdAt ?? null;
+      const rawMessage = n?.message ?? "";
       return {
         id: n?.id,
         userId: n?.userId ?? null,
-        message: n?.message ?? "",
+        rawMessage,
+        message: localizeStatusTokens(rawMessage),
         isRead: Boolean(n?.isRead),
         createdAt,
         time: createdAt ? getTimeAgo(createdAt) : "",
