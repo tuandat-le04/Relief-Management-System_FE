@@ -364,7 +364,7 @@ export default function CitizenRescueRequest({
                 emergency
               </span>
             </div>
-            <h2 className="resq-brand-title text-xl">ResQ</h2>
+            <h2 className="resq-brand-title text-xl">CỨU TRỢ THIÊN TAI</h2>
             <span className="hidden md:inline-flex bg-red-100 text-red-600 text-xs font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
               Trực tuyến 24/7
             </span>
@@ -377,12 +377,6 @@ export default function CitizenRescueRequest({
               >
                 Trang chủ
               </button>
-              <a className="hover:text-primary transition-colors" href="#">
-                Bản đồ cứu hộ
-              </a>
-              <a className="hover:text-primary transition-colors" href="#">
-                Hướng dẫn
-              </a>
             </div>
             {currentUser ? (
               <div className="flex items-center gap-3">

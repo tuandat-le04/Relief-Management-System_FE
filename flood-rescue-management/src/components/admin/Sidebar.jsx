@@ -37,7 +37,9 @@ export default function Sidebar() {
             <span className="material-symbols-outlined text-xl">emergency</span>
           </div>
           <div>
-            <h1 className="resq-brand-title text-lg leading-tight">ResQ</h1>
+            <h1 className="resq-brand-title text-lg leading-tight">
+              CỨU TRỢ THIÊN TAI
+            </h1>
             <p className="resq-brand-subtitle mt-0.5 normal-case tracking-normal text-gray-600">
               Quản trị hệ thống
             </p>

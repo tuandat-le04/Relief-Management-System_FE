@@ -380,7 +380,7 @@ export default function CitizenReliefRequest({
                 volunteer_activism
               </span>
             </div>
-            <h2 className="resq-brand-title text-xl">ResQ</h2>
+            <h2 className="resq-brand-title text-xl">CỨU TRỢ THIÊN TAI</h2>
             <span className="hidden md:inline-flex bg-orange-100 text-orange-600 text-xs font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
               Hỗ trợ cứu trợ
             </span>
@@ -392,12 +392,6 @@ export default function CitizenReliefRequest({
                 to="/citizen/dashboard"
               >
                 Trang chủ
-              </Link>
-              <Link className="hover:text-primary transition-colors" to="#">
-                Bản đồ cứu trợ
-              </Link>
-              <Link className="hover:text-primary transition-colors" to="#">
-                Hướng dẫn
               </Link>
             </div>
             <div className="flex items-center gap-3 border-l pl-6 border-gray-200 dark:border-gray-700">
