@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import authService from "../services/authService";
+import SOSVerificationModal from "../components/auth/SOSVerificationModal";
 
 const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -64,7 +65,7 @@ const Login = () => {
           ADMIN: "/admin/dashboard",
           RESCUE_COORDINATOR: "/coordinator/dashboard",
           RESCUE_TEAM: "/rescue-team/dashboard",
-          MANAGER: "/manager/dashboard",
+          MANAGER: "/manager/teams",
           CITIZEN: "/citizen/dashboard",
         };
 
@@ -350,6 +351,8 @@ const Login = () => {
           </div>
         </div>
       </div>
+
+      <SOSVerificationModal />
     </div>
   );
 };

@@ -1,7 +1,15 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../../components/manager/Sidebar";
 import Notification from "../../components/manager/Notification";
+import reportService from "../../services/reportService";
+import vehicleService from "../../services/vehicleService";
+import rescueTeamService from "../../services/rescueTeamService";
+import notificationService from "../../services/notificationService";
+import {
+  getAllWarehouses,
+  getWarehouseInventory,
+} from "../../services/warehouseService";
 import { usePermission } from "../../hooks/usePermission";
 import { Permission } from "../../constants/permissions";
 import { Role } from "../../constants/roles";
@@ -14,7 +22,6 @@ import {
   DirectionsBoat as ShipIcon,
   Refresh as SyncIcon,
   ChevronRight,
-  LocalGasStation as FuelIcon,
   TrendingUp as TrendingUpIcon,
   TrendingDown as TrendingDownIcon,
   MoreVert as MoreIcon,
@@ -25,14 +32,35 @@ import {
   Add as AddIcon,
   Emergency as EmergencyIcon,
   Assessment as AssessmentIcon,
-  LocationOn as LocationIcon,
-  Speed as SpeedIcon,
   Timeline as TimelineIcon,
   Schedule as ScheduleIcon,
   CheckCircle as CheckCircleIcon,
   ErrorOutline as ErrorOutlineIcon,
   Lock as LockIcon,
 } from "@mui/icons-material";
+
+const toNumber = (value) => {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : 0;
+};
+
+const toPercent = (part, total) => {
+  if (!total) return 0;
+  return Math.round((toNumber(part) / toNumber(total)) * 100);
+};
+
+const mapVehicleTypeLabel = (typeRaw) => {
+  const type = String(typeRaw || "").toLowerCase();
+  if (type.includes("cano") || type.includes("boat")) return "Cano";
+  if (
+    type.includes("truck") ||
+    type.includes("xetai") ||
+    type.includes("van")
+  ) {
+    return "Xe tải";
+  }
+  return "Phương tiện";
+};
 
 export default function ManagerDashboard() {
   const navigate = useNavigate();
@@ -54,7 +82,6 @@ export default function ManagerDashboard() {
   // Kiểm tra các quyền cụ thể cho Manager
   const canManageVehicles = hasPermission(Permission.MANAGE_VEHICLES);
   const canManageInventory = hasPermission(Permission.MANAGE_INVENTORY);
-  const canTrackDistributions = hasPermission(Permission.TRACK_DISTRIBUTIONS);
   const canViewReports = hasPermission(Permission.VIEW_RESOURCE_REPORTS);
 
   const [selectedTimeframe, setSelectedTimeframe] = useState("today");
@@ -93,212 +120,288 @@ export default function ManagerDashboard() {
     );
   }
 
-  // Alerts data
-  const [alerts] = useState([
-    {
-      id: 1,
-      type: "critical",
-      title: "Nhiên liệu thấp",
-      message: "Xe Tải VN-003 cần tiếp nhiên liệu ngay",
-      time: "5 phút trước",
-    },
-    {
-      id: 2,
-      type: "warning",
-      title: "Vật tư sắp hết",
-      message: "Bộ sơ cứu chỉ còn 45 bộ",
-      time: "15 phút trước",
-    },
-    {
-      id: 3,
-      type: "info",
-      title: "Nhiệm vụ hoàn thành",
-      message: "Đội A đã hoàn thành phân phối tại Quận 5",
-      time: "30 phút trước",
-    },
-  ]);
+  const [alerts, setAlerts] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
+  const [inventory, setInventory] = useState([]);
+  const [stats, setStats] = useState([]);
+  const [dashboardLoading, setDashboardLoading] = useState(false);
+  const [dashboardError, setDashboardError] = useState("");
+  const [unreadCount, setUnreadCount] = useState(0);
 
-  // Vehicles data
-  const [vehicles] = useState([
-    {
-      id: 1,
-      name: "Xe Tải VN-001",
-      type: "Xe tải",
-      status: "active",
-      driver: "Nguyễn Văn A",
-      location: "Quận 1",
-      fuel: 85,
-      distance: "125 km",
-      lastUpdate: "5 phút trước",
-    },
-    {
-      id: 2,
-      name: "Cano Đội 05",
-      type: "Cano",
-      status: "active",
-      driver: "Trần Văn B",
-      location: "Sông Hàn",
-      fuel: 45,
-      distance: "89 km",
-      lastUpdate: "10 phút trước",
-    },
-    {
-      id: 3,
-      name: "Xe Van RS-12",
-      type: "Xe van",
-      status: "maintenance",
-      driver: "Lê Thị C",
-      location: "Xưởng sửa chữa",
-      fuel: 20,
-      distance: "0 km",
-      lastUpdate: "1 giờ trước",
-    },
-    {
-      id: 4,
-      name: "Xe Tải VN-007",
-      type: "Xe tải",
-      status: "active",
-      driver: "Phạm Văn D",
-      location: "Quận 7",
-      fuel: 92,
-      distance: "234 km",
-      lastUpdate: "2 phút trước",
-    },
-  ]);
+  const loadDashboardData = async () => {
+    setDashboardLoading(true);
+    setDashboardError("");
 
-  // Inventory data
-  const [inventory] = useState([
-    {
-      id: 1,
-      name: "Gạo",
-      quantity: 1250,
-      unit: "kg",
-      status: "good",
-      category: "Thực phẩm",
-      warehouse: "Kho A",
-      restock: "Không cần",
-    },
-    {
-      id: 2,
-      name: "Nước uống",
-      quantity: 850,
-      unit: "chai",
-      status: "warning",
-      category: "Thực phẩm",
-      warehouse: "Kho B",
-      restock: "Trong 3 ngày",
-    },
-    {
-      id: 3,
-      name: "Bộ sơ cứu",
-      quantity: 45,
-      unit: "bộ",
-      status: "critical",
-      category: "Y tế",
-      warehouse: "Trung tâm Y tế",
-      restock: "Khẩn cấp",
-    },
-    {
-      id: 4,
-      name: "Chăn ấm",
-      quantity: 320,
-      unit: "cái",
-      status: "good",
-      category: "Vật dụng",
-      warehouse: "Kho A",
-      restock: "Không cần",
-    },
-  ]);
+    try {
+      const [
+        summaryRes,
+        vehicleRes,
+        teamsRes,
+        availableTeamsRes,
+        warehousesRes,
+        unreadRes,
+      ] = await Promise.all([
+        reportService.getDashboardSummary(),
+        canManageVehicles
+          ? vehicleService.getAllVehicles()
+          : Promise.resolve({ success: true, data: [] }),
+        rescueTeamService.getAllTeams(),
+        rescueTeamService.getAvailableTeams(),
+        canManageInventory
+          ? getAllWarehouses()
+          : Promise.resolve({ success: true, data: [] }),
+        notificationService.getUnreadCount(),
+      ]);
 
-  // Distribution data
-  const [distributions] = useState([
-    {
-      id: 1,
-      area: "Quận 5, TP.HCM",
-      items: "Gạo, Nước, Thuốc men",
-      status: "completed",
-      team: "Đội A",
-      people: 125,
-      timestamp: "2 giờ trước",
-      progress: 100,
-    },
-    {
-      id: 2,
-      area: "Quận 12, TP.HCM",
-      items: "Chăn ấm, Thực phẩm",
-      status: "in-progress",
-      team: "Đội B",
-      people: 89,
-      timestamp: "30 phút trước",
-      progress: 65,
-    },
-    {
-      id: 3,
-      area: "Quận 9, TP.HCM",
-      items: "Vật tư y tế",
-      status: "pending",
-      team: "Đội C",
-      people: 156,
-      timestamp: "Đã lên lịch",
-      progress: 0,
-    },
-  ]);
+      const summary = summaryRes.success ? summaryRes.data || {} : {};
+      const summaryVehicles = summary?.vehicles || {};
+      const summaryMissions = summary?.missions || {};
+      const summaryRequests = summary?.requests || {};
+      const summaryImpact = summary?.impact || {};
 
-  // Stats data
-  const stats = [
-    {
-      title: "Phương Tiện",
-      value: "42",
-      subtitle: "Đang hoạt động",
-      change: "+5",
-      trend: "up",
-      percentage: "+12%",
-      icon: <VehicleIcon sx={{ fontSize: 28 }} />,
-      iconBg: "bg-gradient-to-br from-blue-500 to-indigo-600",
-      chartData: [20, 35, 28, 42],
-    },
-    {
-      title: "Đội Cứu Hộ",
-      value: "15",
-      subtitle: "Đang triển khai",
-      change: "+3",
-      trend: "up",
-      percentage: "+100%",
-      icon: <GroupIcon sx={{ fontSize: 28 }} />,
-      iconBg: "bg-gradient-to-br from-emerald-500 to-teal-600",
-      chartData: [12, 15, 13, 15],
-    },
-    {
-      title: "Vật Tư Thiết Yếu",
-      value: "1,250",
-      subtitle: "kg sẵn sàng phân phối",
-      change: "+200kg",
-      trend: "up",
-      percentage: "+19%",
-      icon: <BoxIcon sx={{ fontSize: 28 }} />,
-      iconBg: "bg-gradient-to-br from-violet-500 to-purple-700",
-      chartData: [800, 950, 1100, 1250],
-    },
-    {
-      title: "Người Được Cứu",
-      value: "89",
-      subtitle: "Trong 24h qua",
-      change: "+12",
-      trend: "up",
-      percentage: "+15.6%",
-      icon: <HeartIcon sx={{ fontSize: 28 }} />,
-      iconBg: "bg-gradient-to-br from-rose-500 to-pink-700",
-      chartData: [45, 67, 78, 89],
-    },
-  ];
+      setUnreadCount(unreadRes.success ? toNumber(unreadRes.data) : 0);
+
+      const vehicleList = vehicleRes.success ? vehicleRes.data || [] : [];
+      const uiVehicles = vehicleList.map((v) => ({
+        id: v.id,
+        name: v.name || v.licensePlate || `Phương tiện #${v.id}`,
+        type: mapVehicleTypeLabel(v.typeRaw || v.type),
+        status: (() => {
+          const raw = String(v.statusRaw || "").toUpperCase();
+          if (raw === "AVAILABLE" || v.status === "ready") return "ready";
+          if (raw === "IN_USE" || v.status === "active") return "active";
+          if (raw === "MAINTENANCE" || v.status === "maintenance") {
+            return "maintenance";
+          }
+          return "inactive";
+        })(),
+        driver: v.driver || "Chưa có lái xe",
+        lastUpdate: v.lastUpdate || "Vừa xong",
+      }));
+      setVehicles(uiVehicles);
+
+      const warehouseList = warehousesRes.success
+        ? warehousesRes.data || []
+        : [];
+      const inventoryPerWarehouse = await Promise.all(
+        warehouseList.map(async (w) => {
+          try {
+            const invRes = await getWarehouseInventory(w.id);
+            return {
+              warehouse: w,
+              items: invRes?.success ? invRes?.data?.items || [] : [],
+            };
+          } catch (error) {
+            return { warehouse: w, items: [] };
+          }
+        }),
+      );
+
+      const flattenedInventory = inventoryPerWarehouse
+        .flatMap(({ warehouse, items }) =>
+          items.map((item) => ({
+            id: `${warehouse.id}-${item.itemId}`,
+            name: item.itemName || `Item #${item.itemId}`,
+            quantity: toNumber(item.quantity),
+            unit: item.unit || "đơn vị",
+            status:
+              toNumber(item.quantity) < 50
+                ? "critical"
+                : toNumber(item.quantity) < 100
+                  ? "warning"
+                  : "good",
+            category: item.itemType || "Nhu yếu phẩm",
+            warehouse:
+              warehouse.name ||
+              warehouse.warehouseName ||
+              `Kho #${warehouse.id}`,
+            restock:
+              toNumber(item.quantity) < 50
+                ? "Khẩn cấp"
+                : toNumber(item.quantity) < 100
+                  ? "Trong 3 ngày"
+                  : "Không cần",
+          })),
+        )
+        .sort((a, b) => a.quantity - b.quantity)
+        .slice(0, 12);
+
+      setInventory(flattenedInventory);
+
+      const lowStockCount = flattenedInventory.filter(
+        (item) => item.status === "critical" || item.status === "warning",
+      ).length;
+
+      const activeMissions =
+        toNumber(summaryMissions.ASSIGNED) +
+        toNumber(summaryMissions.IN_PROGRESS);
+      const completedMissions = toNumber(summaryMissions.COMPLETED);
+      const requestTotal = toNumber(summaryRequests.total);
+      const requestCompleted = toNumber(summaryRequests.COMPLETED);
+
+      const teams = teamsRes.success ? teamsRes.data || [] : [];
+      const teamTotal = teams.length;
+      const teamAvailableCount = availableTeamsRes.success
+        ? (availableTeamsRes.data || []).length
+        : 0;
+      const teamActive = teams.filter((t) => {
+        const s = String(t.status || "").toUpperCase();
+        return s === "ACTIVE" || s === "BUSY";
+      }).length;
+
+      const vehicleTotal = toNumber(summaryVehicles.total);
+      const vehicleAvailable = toNumber(summaryVehicles.AVAILABLE);
+      const vehicleInUse = toNumber(summaryVehicles.IN_USE);
+      const vehicleReadiness = toPercent(vehicleAvailable, vehicleTotal);
+
+      const totalInventoryQty = flattenedInventory.reduce(
+        (sum, item) => sum + toNumber(item.quantity),
+        0,
+      );
+
+      setStats([
+        {
+          title: "Phương Tiện",
+          value: `${vehicleTotal.toLocaleString("vi-VN")}`,
+          subtitle: `${vehicleAvailable} sẵn sàng / ${vehicleInUse} đang dùng`,
+          trend: vehicleReadiness >= 70 ? "up" : "down",
+          percentage: `${vehicleReadiness}% sẵn sàng`,
+          icon: <VehicleIcon sx={{ fontSize: 28 }} />,
+          iconBg: "bg-gradient-to-br from-blue-500 to-indigo-600",
+          chartData: [
+            vehicleAvailable,
+            vehicleInUse,
+            Math.max(0, vehicleTotal - vehicleAvailable - vehicleInUse),
+            vehicleTotal,
+          ],
+        },
+        {
+          title: "Đội Cứu Hộ",
+          value: `${teamTotal.toLocaleString("vi-VN")}`,
+          subtitle: `${teamAvailableCount} đội sẵn sàng`,
+          trend: activeMissions > 0 ? "up" : "down",
+          percentage: `${teamActive} đội đang hoạt động`,
+          icon: <GroupIcon sx={{ fontSize: 28 }} />,
+          iconBg: "bg-gradient-to-br from-emerald-500 to-teal-600",
+          chartData: [
+            teamAvailableCount,
+            teamActive,
+            Math.max(0, teamTotal - teamActive),
+            teamTotal,
+          ],
+        },
+        {
+          title: "Vật Tư Thiết Yếu",
+          value: `${totalInventoryQty.toLocaleString("vi-VN")}`,
+          subtitle: `${flattenedInventory.length} mặt hàng ưu tiên`,
+          trend: lowStockCount > 0 ? "down" : "up",
+          percentage:
+            lowStockCount > 0
+              ? `${lowStockCount} mặt hàng cần nhập thêm`
+              : "Ổn định",
+          icon: <BoxIcon sx={{ fontSize: 28 }} />,
+          iconBg: "bg-gradient-to-br from-violet-500 to-purple-700",
+          chartData: [
+            Math.max(totalInventoryQty - 200, 0),
+            Math.max(totalInventoryQty - 120, 0),
+            Math.max(totalInventoryQty - 40, 0),
+            totalInventoryQty,
+          ],
+        },
+        {
+          title: "Người Được Cứu",
+          value: `${toNumber(summaryImpact.totalPeopleRescued).toLocaleString("vi-VN")}`,
+          subtitle: `${requestCompleted}/${requestTotal} yêu cầu đã xử lý`,
+          trend: toNumber(summaryImpact.totalPeopleRescued) > 0 ? "up" : "down",
+          percentage: `${toNumber(summaryMissions.CANCELLED)} nhiệm vụ hủy`,
+          icon: <HeartIcon sx={{ fontSize: 28 }} />,
+          iconBg: "bg-gradient-to-br from-rose-500 to-pink-700",
+          chartData: [
+            Math.max(toNumber(summaryImpact.totalPeopleRescued) - 30, 0),
+            Math.max(toNumber(summaryImpact.totalPeopleRescued) - 20, 0),
+            Math.max(toNumber(summaryImpact.totalPeopleRescued) - 10, 0),
+            toNumber(summaryImpact.totalPeopleRescued),
+          ],
+        },
+      ]);
+
+      const newAlerts = [];
+
+      if (vehicleTotal > 0 && vehicleReadiness < 50) {
+        newAlerts.push({
+          id: "a-vehicle-readiness",
+          type: "critical",
+          title: "Phương tiện sẵn sàng thấp",
+          message: `Hiện chỉ ${vehicleReadiness}% phương tiện đang sẵn sàng cho điều phối.`,
+          time: "Vừa xong",
+        });
+      }
+
+      if (lowStockCount > 0) {
+        newAlerts.push({
+          id: "a-inventory-low",
+          type: "warning",
+          title: "Cảnh báo tồn kho",
+          message: `Có ${lowStockCount} mặt hàng dưới ngưỡng an toàn, cần bổ sung sớm.`,
+          time: "Vừa xong",
+        });
+      }
+
+      if (completedMissions > 0) {
+        newAlerts.push({
+          id: "a-mission-completed",
+          type: "success",
+          title: "Nhiệm vụ đã hoàn thành",
+          message: `Đã hoàn thành ${completedMissions} nhiệm vụ trong đợt theo dõi hiện tại.`,
+          time: "Vừa xong",
+        });
+      }
+
+      if (toNumber(unreadRes?.data) > 0) {
+        newAlerts.push({
+          id: "a-notifications-unread",
+          type: "info",
+          title: "Có thông báo chưa đọc",
+          message: `Bạn có ${toNumber(unreadRes.data)} thông báo chưa đọc cần kiểm tra.`,
+          time: "Vừa xong",
+        });
+      }
+
+      if (newAlerts.length === 0) {
+        newAlerts.push({
+          id: "a-default",
+          type: "info",
+          title: "Hệ thống ổn định",
+          message:
+            "Chưa có cảnh báo nghiêm trọng trong chu kỳ đồng bộ gần nhất.",
+          time: "Vừa xong",
+        });
+      }
+
+      setAlerts(newAlerts);
+    } catch (error) {
+      console.error("Không thể tải dữ liệu dashboard manager:", error);
+      setDashboardError(
+        "Không thể tải dữ liệu thật cho Dashboard. Vui lòng thử lại.",
+      );
+    } finally {
+      setDashboardLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDashboardData();
+  }, [selectedTimeframe]);
 
   const getVehicleStatusBadge = (status) => {
     const styles = {
+      ready: "bg-cyan-100 text-cyan-700 ring-1 ring-cyan-600/20",
       active: "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-600/20",
       inactive: "bg-slate-100 text-slate-700 ring-1 ring-slate-600/20",
       maintenance: "bg-amber-100 text-amber-700 ring-1 ring-amber-600/20",
     };
     const labels = {
+      ready: "Sẵn sàng",
       active: "Hoạt động",
       inactive: "Không hoạt động",
       maintenance: "Bảo trì",
@@ -322,23 +425,6 @@ export default function ManagerDashboard() {
     };
     return {
       style: styles[status] || styles.good,
-      label: labels[status] || status,
-    };
-  };
-
-  const getDistributionStatusBadge = (status) => {
-    const styles = {
-      completed: "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-600/20",
-      "in-progress": "bg-blue-100 text-blue-700 ring-1 ring-blue-600/20",
-      pending: "bg-slate-100 text-slate-700 ring-1 ring-slate-600/20",
-    };
-    const labels = {
-      completed: "Hoàn thành",
-      "in-progress": "Đang thực hiện",
-      pending: "Chờ xử lý",
-    };
-    return {
-      style: styles[status] || styles.pending,
       label: labels[status] || status,
     };
   };
@@ -411,11 +497,11 @@ export default function ManagerDashboard() {
                     sx={{ fontSize: 22 }}
                     className="text-slate-700 group-hover:scale-110 transition-transform"
                   />
-                  {alerts.length > 0 && (
+                  {unreadCount > 0 && (
                     <>
                       <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full ring-2 ring-white animate-pulse"></span>
                       <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
-                        {alerts.length}
+                        {unreadCount}
                       </span>
                     </>
                   )}
@@ -433,12 +519,16 @@ export default function ManagerDashboard() {
                 </div>
 
                 {/* Refresh button */}
-                <button className="flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all duration-300 font-semibold group">
+                <button
+                  onClick={loadDashboardData}
+                  disabled={dashboardLoading}
+                  className="flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-70 disabled:cursor-not-allowed text-white rounded-2xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all duration-300 font-semibold group"
+                >
                   <SyncIcon
                     sx={{ fontSize: 20 }}
-                    className="group-hover:rotate-180 transition-transform duration-700"
+                    className={`${dashboardLoading ? "animate-spin" : "group-hover:rotate-180"} transition-transform duration-700`}
                   />
-                  <span>Làm mới</span>
+                  <span>{dashboardLoading ? "Đang tải..." : "Làm mới"}</span>
                 </button>
 
                 {/* User Menu */}
@@ -508,6 +598,18 @@ export default function ManagerDashboard() {
             </div>
           </div>
 
+          {dashboardError && (
+            <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-center justify-between gap-3">
+              <span>{dashboardError}</span>
+              <button
+                onClick={loadDashboardData}
+                className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold transition-colors"
+              >
+                Thử lại
+              </button>
+            </div>
+          )}
+
           {/* Modern Stats Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {stats.map((stat, index) => (
@@ -574,7 +676,7 @@ export default function ManagerDashboard() {
                         key={idx}
                         className="flex-1 bg-gradient-to-t from-slate-200 to-slate-300 rounded-t-lg group-hover:from-blue-400 group-hover:to-blue-500 transition-all duration-500"
                         style={{
-                          height: `${(value / Math.max(...stat.chartData)) * 100}%`,
+                          height: `${(value / Math.max(...stat.chartData, 1)) * 100}%`,
                           transitionDelay: `${idx * 50}ms`,
                         }}
                       ></div>
@@ -632,10 +734,7 @@ export default function ManagerDashboard() {
                           Trạng Thái
                         </th>
                         <th className="px-6 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">
-                          Vị Trí
-                        </th>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">
-                          Nhiên Liệu
+                          Lái Xe
                         </th>
                       </tr>
                     </thead>
@@ -673,7 +772,7 @@ export default function ManagerDashboard() {
                                     {vehicle.name}
                                   </div>
                                   <div className="text-xs text-slate-500">
-                                    {vehicle.type} · {vehicle.driver}
+                                    {vehicle.type}
                                   </div>
                                 </div>
                               </div>
@@ -686,61 +785,8 @@ export default function ManagerDashboard() {
                               </span>
                             </td>
                             <td className="px-6 py-4">
-                              <div className="flex items-center gap-2">
-                                <LocationIcon
-                                  sx={{ fontSize: 16 }}
-                                  className="text-slate-400"
-                                />
-                                <div>
-                                  <div className="text-sm font-medium text-slate-900">
-                                    {vehicle.location}
-                                  </div>
-                                  <div className="flex items-center gap-1 text-xs text-slate-500">
-                                    <SpeedIcon sx={{ fontSize: 12 }} />
-                                    <span>{vehicle.distance}</span>
-                                  </div>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4">
-                              <div className="flex items-center gap-3">
-                                <div className="flex-1">
-                                  <div className="flex items-center justify-between mb-1">
-                                    <span
-                                      className={`text-xs font-bold ${
-                                        vehicle.fuel < 30
-                                          ? "text-red-600"
-                                          : vehicle.fuel < 50
-                                            ? "text-amber-600"
-                                            : "text-emerald-600"
-                                      }`}
-                                    >
-                                      {vehicle.fuel}%
-                                    </span>
-                                  </div>
-                                  <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                                    <div
-                                      className={`h-full rounded-full transition-all duration-500 ${
-                                        vehicle.fuel < 30
-                                          ? "bg-gradient-to-r from-red-500 to-red-600"
-                                          : vehicle.fuel < 50
-                                            ? "bg-gradient-to-r from-amber-500 to-amber-600"
-                                            : "bg-gradient-to-r from-emerald-500 to-emerald-600"
-                                      }`}
-                                      style={{ width: `${vehicle.fuel}%` }}
-                                    ></div>
-                                  </div>
-                                </div>
-                                <FuelIcon
-                                  sx={{ fontSize: 18 }}
-                                  className={
-                                    vehicle.fuel < 30
-                                      ? "text-red-500"
-                                      : vehicle.fuel < 50
-                                        ? "text-amber-500"
-                                        : "text-emerald-500"
-                                  }
-                                />
+                              <div className="text-sm font-medium text-slate-900">
+                                {vehicle.driver || "Chưa có lái xe"}
                               </div>
                             </td>
                           </tr>
@@ -762,105 +808,6 @@ export default function ManagerDashboard() {
                   </h3>
                   <p className="text-slate-500">
                     Bạn không có quyền quản lý phương tiện.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Distribution Tracking - Modern Design */}
-            {canTrackDistributions ? (
-              <div className="bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden">
-                <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-transparent">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-3 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 text-white shadow-lg shadow-purple-500/20">
-                        <ShipIcon sx={{ fontSize: 24 }} />
-                      </div>
-                      <div>
-                        <h2 className="text-xl font-bold text-slate-900">
-                          Phân Phối
-                        </h2>
-                        <p className="text-sm text-slate-600 mt-0.5">
-                          Theo dõi phân bổ nguồn lực
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-6 space-y-4 max-h-[500px] overflow-y-auto">
-                  {distributions.map((dist) => {
-                    const status = getDistributionStatusBadge(dist.status);
-                    return (
-                      <div
-                        key={dist.id}
-                        className="group p-5 rounded-2xl border-2 border-slate-100 hover:border-blue-200 bg-slate-50/50 hover:bg-blue-50/50 transition-all duration-300"
-                      >
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="flex-1">
-                            <h3 className="text-base font-bold text-slate-900 mb-1">
-                              {dist.area}
-                            </h3>
-                            <p className="text-xs text-slate-600 mb-2">
-                              {dist.items}
-                            </p>
-                            <div className="flex items-center gap-2 text-xs text-slate-500">
-                              <span className="font-medium">{dist.team}</span>
-                              <span>•</span>
-                              <span>{dist.people} người</span>
-                            </div>
-                          </div>
-                          <span
-                            className={`inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-bold ${status.style}`}
-                          >
-                            {status.label}
-                          </span>
-                        </div>
-
-                        {dist.status !== "pending" && (
-                          <div className="mt-3">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-xs font-semibold text-slate-600">
-                                Tiến độ
-                              </span>
-                              <span className="text-xs font-bold text-slate-900">
-                                {dist.progress}%
-                              </span>
-                            </div>
-                            <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full transition-all duration-700"
-                                style={{ width: `${dist.progress}%` }}
-                              ></div>
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="mt-3 pt-3 border-t border-slate-200 flex items-center justify-between">
-                          <span className="text-xs text-slate-500">
-                            {dist.timestamp}
-                          </span>
-                          <button className="text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors">
-                            Chi tiết →
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : (
-              <div className="bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden p-12">
-                <div className="text-center">
-                  <LockIcon
-                    sx={{ fontSize: 48 }}
-                    className="text-slate-300 mb-4"
-                  />
-                  <h3 className="text-xl font-bold text-slate-700 mb-2">
-                    Không có quyền truy cập
-                  </h3>
-                  <p className="text-slate-500">
-                    Bạn không có quyền theo dõi phân phối.
                   </p>
                 </div>
               </div>

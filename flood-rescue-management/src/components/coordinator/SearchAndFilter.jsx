@@ -9,14 +9,14 @@ const FILTER_BUTTONS = [
   },
   {
     key: "rescue",
-    label: "🚨 Cứu hộ",
+    label: "Cứu hộ",
     activeClass: "bg-red-600 text-white",
     hoverClass:
       "bg-slate-100 text-slate-600 hover:bg-red-100 hover:text-red-600",
   },
   {
     key: "relief",
-    label: "🤝 Cứu trợ",
+    label: "Cứu trợ",
     activeClass: "bg-green-600 text-white",
     hoverClass:
       "bg-slate-100 text-slate-600 hover:bg-green-100 hover:text-green-600",

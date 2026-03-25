@@ -39,6 +39,11 @@ const getVehicleIcon = (type) => {
 };
 
 // ─── Component chính ─────────────────────────────────────────────────────────
+// Luồng xử lý chính:
+// 1) Chọn đội cứu hộ (bắt buộc)
+// 2) Gán phương tiện (tùy chọn)
+// 3) Gán vật tư (tùy chọn)
+// Khi submit sẽ chạy tuần tự để dễ khoanh vùng lỗi theo từng bước nghiệp vụ.
 const AssignMissionModal = ({ isOpen, onClose, request, onSuccess }) => {
   // ── Mission ──
   const [mission, setMission] = useState(null);
@@ -60,6 +65,7 @@ const AssignMissionModal = ({ isOpen, onClose, request, onSuccess }) => {
   const [vehicles, setVehicles] = useState([]);
   const [loadingVehicles, setLoadingVehicles] = useState(false);
   const [vehicleError, setVehicleError] = useState(null);
+  const [vehicleSearch, setVehicleSearch] = useState("");
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [vehicleAssigned, setVehicleAssigned] = useState(false);
   const [loadingAssignVehicle, setLoadingAssignVehicle] = useState(false);
@@ -73,6 +79,7 @@ const AssignMissionModal = ({ isOpen, onClose, request, onSuccess }) => {
   const [inventory, setInventory] = useState([]);
   const [loadingInventory, setLoadingInventory] = useState(false);
   const [inventoryError, setInventoryError] = useState(null);
+  const [inventorySearch, setInventorySearch] = useState("");
   const [selectedItems, setSelectedItems] = useState({}); // { [inventoryId]: { inventoryId, itemName, stock, qty } }
   const [suppliesAssigned, setSuppliesAssigned] = useState(false);
   const [loadingAssignSupplies, setLoadingAssignSupplies] = useState(false);
@@ -101,12 +108,14 @@ const AssignMissionModal = ({ isOpen, onClose, request, onSuccess }) => {
     setTeamError(null);
     setVehicles([]);
     setVehicleError(null);
+    setVehicleSearch("");
     setSelectedVehicle(null);
     setVehicleAssigned(false);
     setWarehouses([]);
     setWarehouseSearch("");
     setSelectedWarehouse(null);
     setInventory([]);
+    setInventorySearch("");
     setInventoryError(null);
     setSelectedItems({});
     setSuppliesAssigned(false);
@@ -163,6 +172,7 @@ const AssignMissionModal = ({ isOpen, onClose, request, onSuccess }) => {
     setLoadingInventory(true);
     setInventoryError(null);
     setInventory([]);
+    setInventorySearch("");
     setSelectedItems({});
     const result = await getInventoryForModal(warehouseId);
     if (result.success) {
@@ -205,8 +215,47 @@ const AssignMissionModal = ({ isOpen, onClose, request, onSuccess }) => {
   const filteredWarehouses = useMemo(() => {
     const kw = warehouseSearch.trim().toLowerCase();
     if (!kw) return warehouses;
-    return warehouses.filter((w) => w.address?.toLowerCase().includes(kw));
+    return warehouses.filter((w) => {
+      const byAddress = String(w.address || "")
+        .toLowerCase()
+        .includes(kw);
+      const byName = String(w.name || w.warehouseName || "")
+        .toLowerCase()
+        .includes(kw);
+      const byId = String(w.id || "").includes(kw);
+      return byAddress || byName || byId;
+    });
   }, [warehouses, warehouseSearch]);
+
+  // ─── Lọc phương tiện theo search ──────────────────────────────
+  const filteredVehicles = useMemo(() => {
+    const kw = vehicleSearch.trim().toLowerCase();
+    if (!kw) return vehicles;
+    return vehicles.filter((v) => {
+      const plate = String(v.licensePlate || v.code || "").toLowerCase();
+      const model = String(v.model || "").toLowerCase();
+      const typeRaw = String(v.typeRaw || v.type || "").toLowerCase();
+      const id = String(v.id || "");
+      return (
+        plate.includes(kw) ||
+        model.includes(kw) ||
+        typeRaw.includes(kw) ||
+        id.includes(kw)
+      );
+    });
+  }, [vehicles, vehicleSearch]);
+
+  // ─── Lọc vật tư theo search ───────────────────────────────────
+  const filteredInventory = useMemo(() => {
+    const kw = inventorySearch.trim().toLowerCase();
+    if (!kw) return inventory;
+    return inventory.filter((item) => {
+      const name = String(item.itemName || "").toLowerCase();
+      const type = String(item.itemType || "").toLowerCase();
+      const id = String(item.inventoryId || "");
+      return name.includes(kw) || type.includes(kw) || id.includes(kw);
+    });
+  }, [inventory, inventorySearch]);
 
   // ─── Item selection helpers ────────────────────────────────────
   const setItemQty = (item, qty) => {
@@ -253,6 +302,11 @@ const AssignMissionModal = ({ isOpen, onClose, request, onSuccess }) => {
     });
     setLoadingAssignTeam(false);
     if (result.success) {
+      const refreshedMission = await missionService.getMissionById(missionId);
+      if (refreshedMission.success && refreshedMission.data) {
+        setMission(refreshedMission.data);
+      }
+
       setTeamAssigned(true);
       return true;
     } else {
@@ -348,6 +402,7 @@ const AssignMissionModal = ({ isOpen, onClose, request, onSuccess }) => {
   };
 
   // ─── Submit tổng — gọi tuần tự team → vehicle → supplies ────────────────
+  // Mục tiêu: nếu bước nào fail thì dừng ngay, user biết chính xác lỗi ở đâu.
   const handleSubmit = async () => {
     if (!selectedTeam) {
       setTeamError("Vui lòng chọn đội cứu hộ trước khi xác nhận");
@@ -656,6 +711,14 @@ const AssignMissionModal = ({ isOpen, onClose, request, onSuccess }) => {
               />
             ) : (
               <>
+                <SearchBox
+                  value={vehicleSearch}
+                  onChange={setVehicleSearch}
+                  placeholder="Tìm xe theo biển số, model, loại xe..."
+                  onRefresh={loadVehicles}
+                  loading={loadingVehicles}
+                />
+
                 {loadingVehicles ? (
                   <LoadingRow
                     label="Đang tải danh sách phương tiện..."
@@ -676,12 +739,18 @@ const AssignMissionModal = ({ isOpen, onClose, request, onSuccess }) => {
                       </p>
                     </div>
                   </div>
+                ) : filteredVehicles.length === 0 ? (
+                  <EmptyRow
+                    icon="search_off"
+                    message={`Không tìm thấy phương tiện nào khớp "${vehicleSearch}"`}
+                  />
                 ) : (
                   <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
                     <p className="text-xs text-slate-500 font-semibold">
-                      {vehicles.length} phương tiện sẵn sàng — chọn hoặc bỏ qua:
+                      {filteredVehicles.length}/{vehicles.length} phương tiện phù
+                      hợp — chọn hoặc bỏ qua:
                     </p>
-                    {vehicles.map((v) => {
+                    {filteredVehicles.map((v) => {
                       const isSelected = selectedVehicle?.id === v.id;
                       return (
                         <button
@@ -891,6 +960,14 @@ const AssignMissionModal = ({ isOpen, onClose, request, onSuccess }) => {
                       </button>
                     </div>
 
+                    <div className="p-3 border-b border-slate-100">
+                      <SearchBox
+                        value={inventorySearch}
+                        onChange={setInventorySearch}
+                        placeholder="Tìm vật tư theo tên, loại, ID..."
+                      />
+                    </div>
+
                     {loadingInventory ? (
                       <div className="px-3 py-4">
                         <LoadingRow label="Đang tải vật tư..." color="green" />
@@ -913,6 +990,13 @@ const AssignMissionModal = ({ isOpen, onClose, request, onSuccess }) => {
                           message="Kho này hiện không có vật tư"
                         />
                       </div>
+                    ) : filteredInventory.length === 0 ? (
+                      <div className="p-3">
+                        <EmptyRow
+                          icon="search_off"
+                          message={`Không có vật tư nào khớp "${inventorySearch}"`}
+                        />
+                      </div>
                     ) : (
                       <div className="max-h-52 overflow-y-auto">
                         <table className="w-full text-xs">
@@ -930,7 +1014,7 @@ const AssignMissionModal = ({ isOpen, onClose, request, onSuccess }) => {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
-                            {inventory.map((item) => {
+                            {filteredInventory.map((item) => {
                               const sel = selectedItems[item.inventoryId];
                               return (
                                 <tr

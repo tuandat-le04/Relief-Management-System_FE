@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import authService from "../../services/authService";
 import api from "../../services/api";
 import CitizenMapGoong from "../../components/citizen/CitizenMapGoong";
+import avatarUser from "../../assets/images/avatar-user.png";
 
 const MAX_MEDIA_FILES = 5;
 const MAX_MEDIA_SIZE_BYTES = 20 * 1024 * 1024; // 20MB
@@ -11,7 +12,10 @@ const formatBytes = (bytes) => {
   const size = Number(bytes);
   if (!Number.isFinite(size) || size <= 0) return "0 B";
   const units = ["B", "KB", "MB", "GB"];
-  const idx = Math.min(units.length - 1, Math.floor(Math.log(size) / Math.log(1024)));
+  const idx = Math.min(
+    units.length - 1,
+    Math.floor(Math.log(size) / Math.log(1024)),
+  );
   const value = size / 1024 ** idx;
   return `${value.toFixed(value >= 10 || idx === 0 ? 0 : 1)} ${units[idx]}`;
 };
@@ -21,7 +25,9 @@ const isAllowedMediaType = (mime) => {
   return mime.startsWith("image/") || mime.startsWith("video/");
 };
 
-export default function CitizenRescueRequest({ requestId: requestIdProp } = {}) {
+export default function CitizenRescueRequest({
+  requestId: requestIdProp,
+} = {}) {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
   const [mediaItems, setMediaItems] = useState([]);
@@ -46,7 +52,10 @@ export default function CitizenRescueRequest({ requestId: requestIdProp } = {}) 
       const n = Number(requestIdProp);
       return Number.isFinite(n) && n > 0 ? n : null;
     }
-    const stored = parseInt(localStorage.getItem("lastRescueRequestId") || "", 10);
+    const stored = parseInt(
+      localStorage.getItem("lastRescueRequestId") || "",
+      10,
+    );
     return Number.isFinite(stored) && stored > 0 ? stored : null;
   }, [requestIdProp]);
 
@@ -65,11 +74,13 @@ export default function CitizenRescueRequest({ requestId: requestIdProp } = {}) 
 
   const currentUser = authService.getCurrentUser();
   const displayName =
-    currentUser?.fullName || currentUser?.username || currentUser?.name || "Người dùng";
-  const roleLabel = currentUser?.role === "CITIZEN" ? "Người dân" : "Người dùng";
-  const avatarUrl =
-    currentUser?.avatar ||
-    "https://lh3.googleusercontent.com/aida-public/AB6AXuC5tF_1eIvvrD83eWRAoe-3d96B0aXaXs0jqAWxqyswKI8LBiqyVvXHOnhHzw7Lo0qP_mmp2JQP3ThRBAd0GohkAV439UpMYlBTQbLcWRY3WSY9C2s9jILWHGFq-ZDjSsiagrlYlpzMYlzr6tn60wG23atqijkSQSWYuGpd0_vlJ47riljO8rivoPHnrBImgTd_4MZ8AKU-xUIEDckE7iwA8Y3sEa_Fpguo4ZwL_MDTXnAITVBYEaXXfxKQb098GdXmTcTnamZUeU0";
+    currentUser?.fullName ||
+    currentUser?.username ||
+    currentUser?.name ||
+    "Người dùng";
+  const roleLabel =
+    currentUser?.role === "CITIZEN" ? "Người dân" : "Người dùng";
+  const avatarUrl = currentUser?.avatar || avatarUser;
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -96,11 +107,15 @@ export default function CitizenRescueRequest({ requestId: requestIdProp } = {}) 
           break;
         }
         if (!isAllowedMediaType(file.type)) {
-          errors.push(`File "${file.name}" không đúng định dạng (chỉ cho phép ảnh/video).`);
+          errors.push(
+            `File "${file.name}" không đúng định dạng (chỉ cho phép ảnh/video).`,
+          );
           continue;
         }
         if (file.size > MAX_MEDIA_SIZE_BYTES) {
-          errors.push(`File "${file.name}" vượt quá 20MB (${formatBytes(file.size)}).`);
+          errors.push(
+            `File "${file.name}" vượt quá 20MB (${formatBytes(file.size)}).`,
+          );
           continue;
         }
 
@@ -161,9 +176,13 @@ export default function CitizenRescueRequest({ requestId: requestIdProp } = {}) 
           const formDataUpload = new FormData();
           formDataUpload.append("file", it.file);
 
-          const res = await api.post(`/rescue-requests/${requestId}/media`, formDataUpload, {
-            headers: { "Content-Type": "multipart/form-data" },
-          });
+          const res = await api.post(
+            `/rescue-requests/${requestId}/media`,
+            formDataUpload,
+            {
+              headers: { "Content-Type": "multipart/form-data" },
+            },
+          );
           return res?.data;
         }),
       );
@@ -216,13 +235,19 @@ export default function CitizenRescueRequest({ requestId: requestIdProp } = {}) 
       try {
         const created = response?.data?.data;
         const createdId = created?.id != null ? Number(created.id) : null;
-        if (created?.id != null) localStorage.setItem("lastRescueRequestId", String(created.id));
+        if (created?.id != null)
+          localStorage.setItem("lastRescueRequestId", String(created.id));
 
         // Upload media (if any) after request is created
         if (mediaItems.length > 0 && createdId) {
-          const { success, failed } = await uploadMediaFiles(createdId, mediaItems);
+          const { success, failed } = await uploadMediaFiles(
+            createdId,
+            mediaItems,
+          );
           if (failed === 0) {
-            window.alert(`Upload thành công ${success}/${mediaItems.length} file.`);
+            window.alert(
+              `Upload thành công ${success}/${mediaItems.length} file.`,
+            );
           } else {
             window.alert(
               `Upload xong: ${success}/${mediaItems.length} file thành công, ${failed} file thất bại.`,
@@ -277,7 +302,7 @@ export default function CitizenRescueRequest({ requestId: requestIdProp } = {}) 
 
       setIsLocating(true);
 
-            navigator.geolocation.getCurrentPosition(
+      navigator.geolocation.getCurrentPosition(
         async (position) => {
           try {
             const { latitude, longitude } = position.coords;
@@ -293,14 +318,16 @@ export default function CitizenRescueRequest({ requestId: requestIdProp } = {}) 
         },
         (error) => {
           console.error("Geolocation error", error);
-          alert("Không lấy được vị trí. Vui lòng kiểm tra quyền truy cập vị trí.");
+          alert(
+            "Không lấy được vị trí. Vui lòng kiểm tra quyền truy cập vị trí.",
+          );
           setIsLocating(false);
         },
         {
           enableHighAccuracy: true,
           timeout: 10000,
           maximumAge: 0,
-        }
+        },
       );
     } catch (e) {
       console.error(e);
@@ -312,7 +339,8 @@ export default function CitizenRescueRequest({ requestId: requestIdProp } = {}) 
   const completedSteps = (() => {
     let steps = 0;
     if (formData.fullName.trim() && formData.phone.trim()) steps += 1;
-    if (formData.address.trim() && coords.latitude && coords.longitude) steps += 1;
+    if (formData.address.trim() && coords.latitude && coords.longitude)
+      steps += 1;
     if (formData.description.trim()) steps += 1;
     return steps;
   })();
@@ -331,35 +359,42 @@ export default function CitizenRescueRequest({ requestId: requestIdProp } = {}) 
             >
               <span className="material-symbols-outlined">arrow_back</span>
             </button>
-            <div className="bg-primary p-1.5 rounded-lg text-white">
-              <span className="material-symbols-outlined block">emergency</span>
+            <div className="resq-brand-mark-sm">
+              <span className="material-symbols-outlined block text-xl">
+                emergency
+              </span>
             </div>
-            <h2 className="text-xl font-bold tracking-tight">Cứu Hộ Việt Nam</h2>
+            <h2 className="resq-brand-title text-xl">CỨU TRỢ THIÊN TAI</h2>
             <span className="hidden md:inline-flex bg-red-100 text-red-600 text-xs font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
               Trực tuyến 24/7
             </span>
           </div>
           <div className="flex items-center gap-6">
             <div className="hidden md:flex items-center gap-6 text-sm font-medium">
-              <button onClick={() => navigate("/citizen/dashboard")} className="hover:text-primary transition-colors">
+              <button
+                onClick={() => navigate("/citizen/dashboard")}
+                className="hover:text-primary transition-colors"
+              >
                 Trang chủ
               </button>
-              <a className="hover:text-primary transition-colors" href="#">
-                Bản đồ cứu hộ
-              </a>
-              <a className="hover:text-primary transition-colors" href="#">
-                Hướng dẫn
-              </a>
             </div>
             {currentUser ? (
               <div className="flex items-center gap-3">
                 <button className="flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 p-1 pl-1 pr-3 rounded-full transition-all border border-transparent hover:border-gray-200 dark:hover:border-gray-700 group">
                   <div className="size-8 bg-gray-200 rounded-full overflow-hidden ring-2 ring-white dark:ring-gray-800 shadow-sm group-hover:ring-primary/20 transition-all">
-                    <img alt="User Avatar" className="w-full h-full object-cover" src={avatarUrl} />
+                    <img
+                      alt="User Avatar"
+                      className="w-full h-full object-cover"
+                      src={avatarUrl}
+                    />
                   </div>
                   <div className="text-left hidden lg:block">
-                    <p className="text-xs font-bold text-gray-900 dark:text-gray-100 leading-tight">{displayName}</p>
-                    <p className="text-[10px] text-gray-500 font-medium">{roleLabel}</p>
+                    <p className="text-xs font-bold text-gray-900 dark:text-gray-100 leading-tight">
+                      {displayName}
+                    </p>
+                    <p className="text-[10px] text-gray-500 font-medium">
+                      {roleLabel}
+                    </p>
                   </div>
                 </button>
                 <button
@@ -389,7 +424,8 @@ export default function CitizenRescueRequest({ requestId: requestIdProp } = {}) 
             Gửi Cứu Hộ Khẩn Cấp
           </h1>
           <p className="text-[#6b7680] dark:text-gray-400 text-lg md:text-xl max-w-2xl">
-            Vui lòng điền thông tin chính xác để đội cứu hộ có thể tiếp cận bạn nhanh nhất. Mọi dữ liệu đều được bảo mật.
+            Vui lòng điền thông tin chính xác để đội cứu hộ có thể tiếp cận bạn
+            nhanh nhất. Mọi dữ liệu đều được bảo mật.
           </p>
         </div>
 
@@ -420,7 +456,9 @@ export default function CitizenRescueRequest({ requestId: requestIdProp } = {}) 
           <section className="bg-white dark:bg-gray-900 border border-[#dee0e3] dark:border-gray-800 rounded-xl overflow-hidden shadow-sm">
             <div className="border-b border-[#f1f2f3] dark:border-gray-800 px-6 py-4 bg-gray-50/50 dark:bg-gray-800/50">
               <h3 className="text-xl font-bold flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary">person</span>
+                <span className="material-symbols-outlined text-primary">
+                  person
+                </span>
                 1. Thông tin người cần cứu hộ
               </h3>
             </div>
@@ -460,7 +498,9 @@ export default function CitizenRescueRequest({ requestId: requestIdProp } = {}) 
           <section className="bg-white dark:bg-gray-900 border border-[#dee0e3] dark:border-gray-800 rounded-xl overflow-hidden shadow-sm">
             <div className="border-b border-[#f1f2f3] dark:border-gray-800 px-6 py-4 bg-gray-50/50 dark:bg-gray-800/50">
               <h3 className="text-xl font-bold flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary">location_on</span>
+                <span className="material-symbols-outlined text-primary">
+                  location_on
+                </span>
                 2. Vị trí hiện tại
               </h3>
             </div>
@@ -485,7 +525,9 @@ export default function CitizenRescueRequest({ requestId: requestIdProp } = {}) 
                     className="bg-primary/10 hover:bg-primary/20 text-primary h-14 px-6 rounded-lg font-bold flex items-center justify-center gap-2 transition-colors whitespace-nowrap disabled:opacity-60 disabled:cursor-not-allowed"
                     disabled={isLocating}
                   >
-                    <span className="material-symbols-outlined">my_location</span>
+                    <span className="material-symbols-outlined">
+                      my_location
+                    </span>
                     {isLocating ? "Đang lấy vị trí..." : "Lấy vị trí tự động"}
                   </button>
                 </div>
@@ -497,8 +539,12 @@ export default function CitizenRescueRequest({ requestId: requestIdProp } = {}) 
                   className="absolute inset-0 flex items-center justify-center bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors"
                 >
                   <div className="bg-white/90 dark:bg-black/80 px-4 py-2 rounded-full shadow-lg border border-primary/20 flex items-center gap-2">
-                    <span className="material-symbols-outlined text-red-600">location_on</span>
-                    <span className="font-medium text-sm">Chọn vị trí trên bản đồ</span>
+                    <span className="material-symbols-outlined text-red-600">
+                      location_on
+                    </span>
+                    <span className="font-medium text-sm">
+                      Chọn vị trí trên bản đồ
+                    </span>
                   </div>
                 </button>
               </div>
@@ -509,7 +555,9 @@ export default function CitizenRescueRequest({ requestId: requestIdProp } = {}) 
           <section className="bg-white dark:bg-gray-900 border border-[#dee0e3] dark:border-gray-800 rounded-xl overflow-hidden shadow-sm">
             <div className="border-b border-[#f1f2f3] dark:border-gray-800 px-6 py-4 bg-gray-50/50 dark:bg-gray-800/50">
               <h3 className="text-xl font-bold flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary">report_problem</span>
+                <span className="material-symbols-outlined text-primary">
+                  report_problem
+                </span>
                 3. Chi tiết tình trạng
               </h3>
             </div>
@@ -546,7 +594,8 @@ export default function CitizenRescueRequest({ requestId: requestIdProp } = {}) 
                   tabIndex={0}
                   onClick={handlePickMediaClick}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") handlePickMediaClick();
+                    if (e.key === "Enter" || e.key === " ")
+                      handlePickMediaClick();
                   }}
                 >
                   <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -555,18 +604,23 @@ export default function CitizenRescueRequest({ requestId: requestIdProp } = {}) 
                     </span>
                   </div>
                   <div className="text-center">
-                    <p className="text-lg font-bold">Chạm để chụp ảnh hoặc tải lên</p>
+                    <p className="text-lg font-bold">
+                      Chạm để chụp ảnh hoặc tải lên
+                    </p>
                     <p className="text-[#6b7680] text-sm">
                       Hệ thống sẽ tự động giảm dung lượng để gửi nhanh hơn
                     </p>
                     <p className="text-[#6b7680] text-xs mt-2 font-medium">
-                      Đã chọn: {mediaItems.length}/{MAX_MEDIA_FILES} • Tối đa 20MB/file
+                      Đã chọn: {mediaItems.length}/{MAX_MEDIA_FILES} • Tối đa
+                      20MB/file
                     </p>
                   </div>
                 </div>
 
                 {mediaError && (
-                  <p className="mt-4 text-sm font-semibold text-red-600">{mediaError}</p>
+                  <p className="mt-4 text-sm font-semibold text-red-600">
+                    {mediaError}
+                  </p>
                 )}
 
                 {mediaItems.length > 0 && (
@@ -594,7 +648,9 @@ export default function CitizenRescueRequest({ requestId: requestIdProp } = {}) 
                           )}
                         </div>
                         <div className="p-3">
-                          <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{it.file.name}</p>
+                          <p className="text-sm font-bold text-gray-900 dark:text-white truncate">
+                            {it.file.name}
+                          </p>
                           <p className="text-xs text-[#6b7680] dark:text-gray-400 font-medium">
                             {formatBytes(it.file.size)}
                           </p>
@@ -640,7 +696,8 @@ export default function CitizenRescueRequest({ requestId: requestIdProp } = {}) 
             </button>
             <div className="mt-6 flex flex-col items-center text-center gap-3">
               <p className="text-[#6b7680] dark:text-gray-400 font-medium">
-                Thông tin của bạn đang được mã hóa và gửi tới trung tâm điều phối gần nhất.
+                Thông tin của bạn đang được mã hóa và gửi tới trung tâm điều
+                phối gần nhất.
               </p>
               <div className="flex items-center gap-2 px-4 py-1.5 bg-yellow-100 text-yellow-800 rounded-full text-xs font-bold uppercase tracking-widest">
                 <span className="material-symbols-outlined text-sm">lock</span>
@@ -656,7 +713,9 @@ export default function CitizenRescueRequest({ requestId: requestIdProp } = {}) 
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-3xl h-[70vh] flex flex-col">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800">
               <h3 className="text-lg font-bold flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary">map</span>
+                <span className="material-symbols-outlined text-primary">
+                  map
+                </span>
                 Chọn vị trí cứu hộ
               </h3>
               <button
@@ -669,7 +728,9 @@ export default function CitizenRescueRequest({ requestId: requestIdProp } = {}) 
             </div>
             <div className="flex-1">
               <CitizenMapGoong
-                initialCoords={coords.latitude && coords.longitude ? coords : null}
+                initialCoords={
+                  coords.latitude && coords.longitude ? coords : null
+                }
                 onSelectLocation={async ({ latitude, longitude }) => {
                   setCoords({ latitude, longitude });
                   await fillAddressFromCoords(latitude, longitude);
@@ -678,7 +739,8 @@ export default function CitizenRescueRequest({ requestId: requestIdProp } = {}) 
             </div>
             <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-800 flex items-center justify-between text-sm">
               <div className="text-gray-600 dark:text-gray-300">
-                Tọa độ đã chọn: {coords.latitude && coords.longitude
+                Tọa độ đã chọn:{" "}
+                {coords.latitude && coords.longitude
                   ? `${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`
                   : "Chưa chọn"}
               </div>
@@ -729,7 +791,8 @@ export default function CitizenRescueRequest({ requestId: requestIdProp } = {}) 
             Lời khuyên an toàn
           </h4>
           <p className="text-sm leading-relaxed text-blue-800 dark:text-blue-200">
-            Hãy giữ bình tĩnh, di chuyển lên vị trí cao hơn và luôn để điện thoại ở chế độ tiết kiệm pin.
+            Hãy giữ bình tĩnh, di chuyển lên vị trí cao hơn và luôn để điện
+            thoại ở chế độ tiết kiệm pin.
           </p>
         </div>
       </aside>
@@ -740,17 +803,24 @@ export default function CitizenRescueRequest({ requestId: requestIdProp } = {}) 
           <div className="col-span-2">
             <div className="flex items-center gap-2 mb-4">
               <div className="bg-primary p-1 rounded text-white">
-                <span className="material-symbols-outlined block text-sm">emergency</span>
+                <span className="material-symbols-outlined block text-sm">
+                  emergency
+                </span>
               </div>
-              <span className="font-bold">Hệ thống Điều phối Cứu hộ Quốc gia</span>
+              <span className="font-bold">
+                Hệ thống Điều phối Cứu hộ Quốc gia
+              </span>
             </div>
             <p className="text-sm text-[#6b7680] max-w-sm">
-              Phát triển bởi Ban Chỉ đạo Quốc gia về Phòng chống thiên tai. Hệ thống kết nối người dân với các
-              đơn vị cứu hộ quân đội, công an và tình nguyện viên.
+              Phát triển bởi Ban Chỉ đạo Quốc gia về Phòng chống thiên tai. Hệ
+              thống kết nối người dân với các đơn vị cứu hộ quân đội, công an và
+              tình nguyện viên.
             </p>
           </div>
           <div>
-            <h5 className="font-bold mb-4 text-sm uppercase tracking-wider">Thông tin</h5>
+            <h5 className="font-bold mb-4 text-sm uppercase tracking-wider">
+              Thông tin
+            </h5>
             <ul className="text-sm space-y-2 text-[#6b7680]">
               <li>
                 <a className="hover:text-primary" href="#">
@@ -770,7 +840,9 @@ export default function CitizenRescueRequest({ requestId: requestIdProp } = {}) 
             </ul>
           </div>
           <div>
-            <h5 className="font-bold mb-4 text-sm uppercase tracking-wider">Hỗ trợ</h5>
+            <h5 className="font-bold mb-4 text-sm uppercase tracking-wider">
+              Hỗ trợ
+            </h5>
             <ul className="text-sm space-y-2 text-[#6b7680]">
               <li>
                 <a className="hover:text-primary" href="#">

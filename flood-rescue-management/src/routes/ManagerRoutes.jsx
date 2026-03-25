@@ -1,23 +1,54 @@
-import React from "react";
+import React, { Suspense, lazy } from "react";
 // import ProtectedRoute from "../components/ProtectedRoute"; // Tạm thời comment để xem preview
-import ManagerDashboard from "../pages/Manager/ManagerDashboard";
-import ManagerVehicle from "../pages/Manager/ManagerVehicle";
-import ManagerInventory from "../pages/Manager/ManagerInventory";
-import ManagerReports from "../pages/Manager/ManagerReports";
+const ManagerTeamManagement = lazy(() =>
+  import("../pages/Manager/ManagerTeamManagement")
+);
+const ManagerVehicle = lazy(() => import("../pages/Manager/ManagerVehicle"));
+const ManagerInventory = lazy(() => import("../pages/Manager/ManagerInventory"));
+const ManagerReports = lazy(() => import("../pages/Manager/ManagerReports"));
+
+const RouteLoadingFallback = (
+  <div
+    style={{
+      minHeight: "100vh",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+    }}
+  >
+    Loading...
+  </div>
+);
 
 const ManagerRoutes = [
   {
+    path: "/manager/teams",
+    element: (
+      <Suspense fallback={RouteLoadingFallback}>
+        <ManagerTeamManagement />
+      </Suspense>
+    ), // Route chính: quản lý đội nhóm
+  },
+  {
     path: "/manager/dashboard",
-    element: <ManagerDashboard />, // Tạm thời bỏ ProtectedRoute để xem preview
+    element: (
+      <Suspense fallback={RouteLoadingFallback}>
+        <ManagerTeamManagement />
+      </Suspense>
+    ), // Alias giữ tương thích đường dẫn cũ
     // element: (
     //   <ProtectedRoute allowedRoles={["manager"]}>
-    //     <ManagerDashboard />
+    //     <ManagerTeamManagement />
     //   </ProtectedRoute>
     // ),
   },
   {
     path: "/manager/vehicles",
-    element: <ManagerVehicle />,
+    element: (
+      <Suspense fallback={RouteLoadingFallback}>
+        <ManagerVehicle />
+      </Suspense>
+    ),
     // element: (
     //   <ProtectedRoute allowedRoles={["manager"]}>
     //     <ManagerVehicle />
@@ -27,14 +58,22 @@ const ManagerRoutes = [
   // Thêm các routes manager khác ở đây
   {
     path: "/manager/inventory",
-    element: <ManagerInventory />,
+    element: (
+      <Suspense fallback={RouteLoadingFallback}>
+        <ManagerInventory />
+      </Suspense>
+    ),
     //     <ProtectedRoute allowedRoles={["manager"]}>
     //       <InventoryManagement />
     //     </ProtectedRoute>
   },
   {
     path: "/manager/reports",
-    element: <ManagerReports />,
+    element: (
+      <Suspense fallback={RouteLoadingFallback}>
+        <ManagerReports />
+      </Suspense>
+    ),
     // element: (
     //   <ProtectedRoute allowedRoles={["manager"]}>
     //     <ManagerReports />

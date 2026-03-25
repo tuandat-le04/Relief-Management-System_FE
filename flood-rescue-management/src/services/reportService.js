@@ -4,6 +4,74 @@ import api from "./api";
 // Theo API.md §2.1 — API Dashboard Summary chuyên biệt
 // Quyền: ADMIN, MANAGER
 
+const pickFirstDefined = (...values) =>
+  values.find((v) => v !== undefined && v !== null);
+
+const normalizeDashboardSummary = (raw) => {
+  const requests = raw?.requests || {};
+  const missions = raw?.missions || {};
+  const vehicles = raw?.vehicles || {};
+  const impact = raw?.impact || {};
+
+  return {
+    requests: {
+      total: pickFirstDefined(raw.totalRequests, requests.total),
+      CREATED: pickFirstDefined(raw.requestsCreated, requests.CREATED),
+      IN_PROGRESS: pickFirstDefined(
+        raw.requestsInProgress,
+        requests.IN_PROGRESS,
+      ),
+      COMPLETED: pickFirstDefined(raw.requestsCompleted, requests.COMPLETED),
+      CANCELLED: pickFirstDefined(
+        raw.requestsCancelled,
+        raw.requestsCanceled,
+        raw.requestsRejected,
+        raw.requestsDeclined,
+        requests.CANCELLED,
+        requests.CANCELED,
+        requests.REJECTED,
+        requests.DECLINED,
+      ),
+    },
+    missions: {
+      total: pickFirstDefined(raw.totalMissions, missions.total),
+      PENDING: pickFirstDefined(raw.missionsPending, missions.PENDING),
+      ASSIGNED: pickFirstDefined(raw.missionsAssigned, missions.ASSIGNED),
+      IN_PROGRESS: pickFirstDefined(
+        raw.missionsInProgress,
+        missions.IN_PROGRESS,
+      ),
+      COMPLETED: pickFirstDefined(raw.missionsCompleted, missions.COMPLETED),
+      CANCELLED: pickFirstDefined(
+        raw.missionsCancelled,
+        raw.missionsCanceled,
+        raw.missionsRejected,
+        raw.missionsDeclined,
+        missions.CANCELLED,
+        missions.CANCELED,
+        missions.REJECTED,
+        missions.DECLINED,
+      ),
+    },
+    vehicles: {
+      total: pickFirstDefined(raw.totalVehicles, vehicles.total),
+      AVAILABLE: pickFirstDefined(raw.vehiclesAvailable, vehicles.AVAILABLE),
+      IN_USE: pickFirstDefined(raw.vehiclesInUse, vehicles.IN_USE),
+      MAINTENANCE: pickFirstDefined(
+        raw.vehiclesMaintenance,
+        vehicles.MAINTENANCE,
+      ),
+    },
+    impact: {
+      totalPeopleRescued: pickFirstDefined(
+        raw.totalPeopleRescued,
+        impact.totalPeopleRescued,
+      ),
+    },
+    raw,
+  };
+};
+
 const reportService = {
   /**
    * Lấy toàn bộ dữ liệu thống kê cho Dashboard trong 1 lần gọi duy nhất.
@@ -19,7 +87,11 @@ const reportService = {
     try {
       const response = await api.get("/reports/summary");
       if (response.data?.success) {
-        return { success: true, data: response.data.data };
+        const raw = response.data.data || {};
+
+        const normalized = normalizeDashboardSummary(raw);
+
+        return { success: true, data: normalized };
       }
       return {
         success: false,

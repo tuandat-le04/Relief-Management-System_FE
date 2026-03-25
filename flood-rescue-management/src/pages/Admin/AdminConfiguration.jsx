@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import Sidebar from "../../components/admin/Sidebar";
 import VehiclesManagement from "../../components/admin/VehiclesManagement";
 import InventoryManagement from "../../components/admin/InventoryManagement";
-import DisasterManagement from "../../components/admin/DisasterManagement";
 import {
   MdDirectionsBoat,
   MdInventory2,
@@ -23,11 +22,6 @@ const AdminConfiguration = () => {
       id: "supplies",
       label: "Danh mục nhu yếu phẩm",
       icon: <MdInventory2 className="text-lg" />,
-    },
-    {
-      id: "zones",
-      label: "Vùng thiên tai",
-      icon: <MdWarning className="text-lg" />,
     },
   ];
 
@@ -66,7 +60,7 @@ const AdminConfiguration = () => {
                 <MdHelp className="text-xl" />
               </button>
               <div className="h-4 w-[1px] bg-gray-200"></div>
-              <p className="text-gray-500 text-xs font-mono">V1.2.4-RC</p>
+              <p className="text-gray-500 text-xs">V1.2.4-RC</p>
             </div>
           </div>
         </header>
@@ -108,7 +102,6 @@ const AdminConfiguration = () => {
             {/* Tab Content */}
             {activeTab === "vehicles" && <VehiclesManagement />}
             {activeTab === "supplies" && <InventoryManagement />}
-            {activeTab === "zones" && <DisasterManagement />}
           </div>
         </div>
       </div>

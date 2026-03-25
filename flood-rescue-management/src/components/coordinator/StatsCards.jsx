@@ -2,20 +2,20 @@ import React from "react";
 
 const STAT_ITEMS = [
   {
-    key: "emergency",
-    label: "Nguy kịch",
-    bgClass: "bg-red-50",
-    borderClass: "border-red-100",
-    labelClass: "text-red-600",
-    valueClass: "text-red-700",
-  },
-  {
     key: "rescue",
     label: "Cứu hộ",
     bgClass: "bg-blue-50",
     borderClass: "border-blue-100",
     labelClass: "text-blue-600",
     valueClass: "text-blue-700",
+  },
+  {
+    key: "accepted",
+    label: "Đã TN",
+    bgClass: "bg-indigo-50",
+    borderClass: "border-indigo-100",
+    labelClass: "text-indigo-600",
+    valueClass: "text-indigo-700",
   },
   {
     key: "inProgress",
@@ -33,11 +33,19 @@ const STAT_ITEMS = [
     labelClass: "text-emerald-600",
     valueClass: "text-emerald-700",
   },
+  {
+    key: "cancelled",
+    label: "Từ chối",
+    bgClass: "bg-rose-50",
+    borderClass: "border-rose-100",
+    labelClass: "text-rose-600",
+    valueClass: "text-rose-700",
+  },
 ];
 
 const StatsCards = ({ stats }) => {
   return (
-    <div className="p-3 grid grid-cols-4 gap-2 border-b border-slate-200">
+    <div className="p-3 grid grid-cols-5 gap-2 border-b border-slate-200">
       {STAT_ITEMS.map((item) => (
         <div
           key={item.key}

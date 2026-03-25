@@ -1,18 +1,189 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Header from "../../components/coordinator/Header";
 import TabBar from "../../components/coordinator/TabBar";
 import StatsCards from "../../components/coordinator/StatsCards";
 import SearchAndFilter from "../../components/coordinator/SearchAndFilter";
 import RequestCard from "../../components/coordinator/RequestCard";
 import MapSection from "../../components/coordinator/MapSection";
-import EmergencyFAB from "../../components/coordinator/EmergencyFAB";
 import CancelRequestModal from "../../components/coordinator/CancelRequestModal";
 import ClassifyRequestModal from "../../components/coordinator/ClassifyRequestModal";
 import RequestDetailModal from "../../components/coordinator/RequestDetailModal";
 import AssignMissionModal from "../../components/coordinator/AssignMissionModal";
+import CompleteRequestModal from "../../components/coordinator/CompleteRequestModal";
 import useMap from "../../hooks/useMap";
 import "../../assets/styles/coordinator.css";
 import rescueRequestService from "../../services/rescueRequestService";
+import missionService from "../../services/missionService";
+
+const getMissionRequestId = (mission) =>
+  mission?.requestId ?? mission?.requestID ?? mission?.request?.id ?? null;
+
+const getMissionUpdatedTime = (mission) => {
+  const raw =
+    mission?.updatedAt ??
+    mission?.endTime ??
+    mission?.startTime ??
+    mission?.createdAt;
+  if (!raw) return 0;
+  const time = new Date(raw).getTime();
+  return Number.isFinite(time) ? time : 0;
+};
+
+const buildLatestMissionMap = (missions) => {
+  const map = {};
+  (Array.isArray(missions) ? missions : []).forEach((mission) => {
+    const requestId = getMissionRequestId(mission);
+    if (!requestId) return;
+    const key = String(requestId);
+    const prev = map[key];
+    const missionId = mission?.id ?? 0;
+    const prevId = prev?.id ?? 0;
+    const missionTime = getMissionUpdatedTime(mission);
+    const prevTime = getMissionUpdatedTime(prev);
+    if (
+      !prev ||
+      missionTime > prevTime ||
+      (missionTime === prevTime && missionId > prevId)
+    ) {
+      map[key] = mission;
+    }
+  });
+  return map;
+};
+
+const buildActiveRequestIdSet = (activeRows) => {
+  const set = new Set();
+  (Array.isArray(activeRows) ? activeRows : []).forEach((row) => {
+    const requestId =
+      row?.request?.id ??
+      row?.mission?.requestId ??
+      row?.mission?.requestID ??
+      null;
+    if (requestId !== null && requestId !== undefined) {
+      set.add(String(requestId));
+    }
+  });
+  return set;
+};
+
+const pickBetterMission = (primary, secondary) => {
+  if (!primary) return secondary || null;
+  if (!secondary) return primary || null;
+
+  // Ưu tiên mission mới hơn theo updated time
+  const primaryTime = getMissionUpdatedTime(primary);
+  const secondaryTime = getMissionUpdatedTime(secondary);
+  const newer = primaryTime >= secondaryTime ? primary : secondary;
+  const older = newer === primary ? secondary : primary;
+
+  // Backfill các field report để tránh mất dữ liệu khi endpoint active-teams trả thiếu
+  return {
+    ...older,
+    ...newer,
+    peopleRescued:
+      newer?.peopleRescued !== undefined && newer?.peopleRescued !== null
+        ? newer.peopleRescued
+        : older?.peopleRescued,
+    summary:
+      newer?.summary !== undefined && newer?.summary !== null
+        ? newer.summary
+        : older?.summary,
+    obstacles:
+      newer?.obstacles !== undefined && newer?.obstacles !== null
+        ? newer.obstacles
+        : older?.obstacles,
+  };
+};
+
+const getRequestStage = (request, mission, isActiveTeamAssigned = false) => {
+  if (!request) return "pending";
+  if (request.status === "CANCELLED") return "cancelled";
+  if (request.status === "COMPLETED") return "completed";
+
+  // Ưu tiên mission status khi đã có mission để tránh lệch trạng thái
+  // (ví dụ request.status còn PENDING nhưng mission đã ARRIVED/IN_PROGRESS)
+  const missionStatus = mission?.status;
+  if (missionStatus === "COMPLETED") return "inprogress";
+  if (missionStatus === "IN_PROGRESS" || missionStatus === "ARRIVED") {
+    return "inprogress";
+  }
+  if (missionStatus === "ASSIGNED") {
+    // UX mới: sau khi phân đội (ASSIGNED) sẽ hiển thị ngay ở tab Đang xử lý
+    return "inprogress";
+  }
+
+  if (request.status === "PENDING") return "pending";
+
+  if (request.status === "IN_PROGRESS") {
+    // Nếu chưa có mission rõ ràng thì vẫn giữ ở Đã tiếp nhận để tránh nhảy tab sớm.
+    if (isActiveTeamAssigned) return "inprogress";
+
+    return "accepted";
+  }
+
+  return "pending";
+};
+
+/**
+ * Chuẩn hoá dữ liệu cho màn hình Coordinator trong 1 lần gọi API:
+ * - Danh sách request
+ * - Mission mới nhất theo requestId
+ * - Set requestId đang có team active
+ */
+const fetchCoordinatorSnapshot = async () => {
+  const [requestResult, missionResult, activeTeamsResult] = await Promise.all([
+    rescueRequestService.getAllRequests(),
+    missionService.getAllMissions(),
+    missionService.getActiveTeamMissions(),
+  ]);
+
+  if (!requestResult.success) {
+    return {
+      success: false,
+      error: requestResult.error,
+      requests: [],
+      missionMap: {},
+      activeRequestIds: new Set(),
+    };
+  }
+
+  const missionMapFromAll = missionResult.success
+    ? buildLatestMissionMap(missionResult.data)
+    : {};
+
+  const missionMapFromActive = {};
+  if (activeTeamsResult.success && Array.isArray(activeTeamsResult.data)) {
+    activeTeamsResult.data.forEach((row) => {
+      const mission = row?.mission;
+      const reqId =
+        row?.request?.id ??
+        mission?.requestId ??
+        mission?.requestID ??
+        mission?.request?.id ??
+        null;
+      if (reqId !== null && reqId !== undefined && mission) {
+        missionMapFromActive[String(reqId)] = mission;
+      }
+    });
+  }
+
+  const mergedMissionMap = { ...missionMapFromAll };
+  Object.keys(missionMapFromActive).forEach((requestIdKey) => {
+    const fromAll = mergedMissionMap[requestIdKey] ?? null;
+    const fromActive = missionMapFromActive[requestIdKey] ?? null;
+    mergedMissionMap[requestIdKey] = pickBetterMission(fromAll, fromActive);
+  });
+
+  return {
+    success: true,
+    error: null,
+    requests: requestResult.data,
+    missionMap: mergedMissionMap,
+    activeRequestIds: activeTeamsResult.success
+      ? buildActiveRequestIdSet(activeTeamsResult.data)
+      : new Set(),
+  };
+};
 
 const CoordinatorDashboard = () => {
   const [activeTab, setActiveTab] = useState("pending");
@@ -21,6 +192,8 @@ const CoordinatorDashboard = () => {
 
   // Dữ liệu từ API
   const [requests, setRequests] = useState([]);
+  const [missionByRequestId, setMissionByRequestId] = useState({});
+  const [activeTeamRequestIds, setActiveTeamRequestIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -29,12 +202,29 @@ const CoordinatorDashboard = () => {
   const [classifyModalOpen, setClassifyModalOpen] = useState(false);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [completeModalOpen, setCompleteModalOpen] = useState(false);
+  const [selectedMissionForComplete, setSelectedMissionForComplete] = useState(null);
+  const [loadingCompleteMission, setLoadingCompleteMission] = useState(false);
+  const [confirmingComplete, setConfirmingComplete] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
 
   // Map hook
   const { mapRef, flyToRequest } = useMap(requests);
 
   // Thống kê
+  const requestsWithMission = useMemo(
+    () =>
+      requests.map((request) => {
+        const mission = missionByRequestId[String(request.id)] ?? null;
+        const isActiveTeamAssigned = activeTeamRequestIds.has(
+          String(request.id),
+        );
+        const stage = getRequestStage(request, mission, isActiveTeamAssigned);
+        return { ...request, mission, stage };
+      }),
+    [requests, missionByRequestId, activeTeamRequestIds],
+  );
+
   const stats = {
     emergency: requests.filter(
       (r) =>
@@ -48,21 +238,27 @@ const CoordinatorDashboard = () => {
     relief: requests.filter(
       (r) => r.type === "Hỗ trợ cứu trợ" && r.status === "PENDING",
     ).length,
-    inProgress: requests.filter((r) => r.status === "IN_PROGRESS").length,
+    accepted: requestsWithMission.filter((r) => r.stage === "accepted").length,
+    inProgress: requestsWithMission.filter((r) => r.stage === "inprogress")
+      .length,
     completed: requests.filter((r) => r.status === "COMPLETED").length,
     cancelled: requests.filter((r) => r.status === "CANCELLED").length,
   };
 
-  // Fetch data từ API
+  // Fetch data từ API (có loading + error cho lần tải chính)
   const fetchRequests = async () => {
     try {
       setLoading(true);
       setError(null);
-      const result = await rescueRequestService.getAllRequests();
-      if (result.success) {
-        setRequests(result.data);
+
+      const snapshot = await fetchCoordinatorSnapshot();
+
+      if (snapshot.success) {
+        setRequests(snapshot.requests);
+        setMissionByRequestId(snapshot.missionMap);
+        setActiveTeamRequestIds(snapshot.activeRequestIds);
       } else {
-        setError(result.error);
+        setError(snapshot.error);
       }
     } catch (err) {
       console.error("Error in fetchRequests:", err);
@@ -78,10 +274,14 @@ const CoordinatorDashboard = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Helper refresh danh sách
+  // Helper refresh nhẹ: không bật loading toàn màn hình
   const refreshRequests = async () => {
-    const updated = await rescueRequestService.getAllRequests();
-    if (updated.success) setRequests(updated.data);
+    const snapshot = await fetchCoordinatorSnapshot();
+    if (!snapshot.success) return;
+
+    setRequests(snapshot.requests);
+    setMissionByRequestId(snapshot.missionMap);
+    setActiveTeamRequestIds(snapshot.activeRequestIds);
   };
 
   // Handlers
@@ -91,7 +291,7 @@ const CoordinatorDashboard = () => {
       if (result.success) {
         alert("✅ " + result.message);
         await refreshRequests();
-        setTimeout(() => setActiveTab("inprogress"), 500);
+        setTimeout(() => setActiveTab("accepted"), 500);
       } else {
         alert("❌ " + result.error);
       }
@@ -100,20 +300,53 @@ const CoordinatorDashboard = () => {
     }
   };
 
-  const handleCompleteRequest = async (requestId) => {
+  const handleOpenCompleteModal = async (requestId) => {
+    const req = requestsWithMission.find((r) => String(r.id) === String(requestId));
+    const mission = missionByRequestId[String(requestId)] ?? null;
+    if (!mission || mission.status !== "COMPLETED") {
+      alert(
+        "⚠️ Đội cứu hộ chưa gửi trạng thái hoàn thành. Bạn chỉ có thể xác nhận sau khi team báo cáo COMPLETED.",
+      );
+      return;
+    }
+
+    setSelectedRequest(req || null);
+    setSelectedMissionForComplete(mission);
+    setCompleteModalOpen(true);
+    setLoadingCompleteMission(true);
+
     try {
+      const detailRes = await missionService.getMissionById(mission.id);
+      if (detailRes.success && detailRes.data) {
+        setSelectedMissionForComplete(detailRes.data);
+      }
+    } finally {
+      setLoadingCompleteMission(false);
+    }
+  };
+
+  const handleConfirmCompleteRequest = async () => {
+    if (!selectedRequest?.id) return;
+
+    try {
+      setConfirmingComplete(true);
       const result = await rescueRequestService.updateRequestStatus(
-        requestId,
+        selectedRequest.id,
         "COMPLETED",
       );
       if (result.success) {
+        setCompleteModalOpen(false);
+        setSelectedMissionForComplete(null);
+        setSelectedRequest(null);
         await refreshRequests();
         setTimeout(() => setActiveTab("completed"), 500);
       } else {
         alert("❌ " + result.error);
       }
     } catch {
-      alert("❌ Không thể cập nhật trạng thái");
+      alert("❌ Không thể xác nhận hoàn thành");
+    } finally {
+      setConfirmingComplete(false);
     }
   };
 
@@ -171,15 +404,15 @@ const CoordinatorDashboard = () => {
     setAssignModalOpen(true);
   };
 
-  // Filtered list
-  const filteredRequests = requests.filter((request) => {
-    if (activeTab === "pending" && request.status !== "PENDING") return false;
-    if (activeTab === "inprogress" && request.status !== "IN_PROGRESS")
-      return false;
-    if (activeTab === "completed" && request.status !== "COMPLETED")
-      return false;
-    if (activeTab === "cancelled" && request.status !== "CANCELLED")
-      return false;
+  // Filtered list: tận dụng requestsWithMission để tránh tính `stage` lặp lại
+  const filteredRequests = requestsWithMission.filter((request) => {
+    const stage = request.stage;
+
+    if (activeTab === "pending" && stage !== "pending") return false;
+    if (activeTab === "accepted" && stage !== "accepted") return false;
+    if (activeTab === "inprogress" && stage !== "inprogress") return false;
+    if (activeTab === "completed" && stage !== "completed") return false;
+    if (activeTab === "cancelled" && stage !== "cancelled") return false;
 
     const matchesSearch =
       request.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -251,6 +484,8 @@ const CoordinatorDashboard = () => {
                 </p>
                 <p className="text-slate-400 text-sm mt-1">
                   {activeTab === "pending" && "Chưa có yêu cầu nào chờ xử lý"}
+                  {activeTab === "accepted" &&
+                    "Chưa có yêu cầu nào đã tiếp nhận (chờ phân công)"}
                   {activeTab === "inprogress" &&
                     "Chưa có yêu cầu nào đang xử lý"}
                   {activeTab === "completed" &&
@@ -264,11 +499,10 @@ const CoordinatorDashboard = () => {
                 <RequestCard
                   key={request.id}
                   request={request}
-                  onApprove={(id, action) =>
-                    action === "complete"
-                      ? handleCompleteRequest(id)
-                      : handleApproveRequest(id)
-                  }
+                  stage={request.stage}
+                  mission={request.mission}
+                  onApprove={handleApproveRequest}
+                  onComplete={handleOpenCompleteModal}
                   onCancel={openCancelModal}
                   onClassify={openClassifyModal}
                   onDetail={openDetailModal}
@@ -282,8 +516,6 @@ const CoordinatorDashboard = () => {
 
         <MapSection mapRef={mapRef} />
       </main>
-
-      <EmergencyFAB />
 
       {/* Modals */}
       <CancelRequestModal
@@ -308,6 +540,19 @@ const CoordinatorDashboard = () => {
         onClose={() => setAssignModalOpen(false)}
         request={selectedRequest}
         onSuccess={refreshRequests}
+      />
+      <CompleteRequestModal
+        isOpen={completeModalOpen}
+        onClose={() => {
+          if (confirmingComplete) return;
+          setCompleteModalOpen(false);
+          setSelectedMissionForComplete(null);
+        }}
+        onConfirm={handleConfirmCompleteRequest}
+        request={selectedRequest}
+        mission={selectedMissionForComplete}
+        loadingMission={loadingCompleteMission}
+        confirming={confirmingComplete}
       />
 
       {/* Styles cho map markers và animations */}

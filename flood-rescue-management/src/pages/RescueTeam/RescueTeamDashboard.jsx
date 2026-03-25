@@ -16,16 +16,6 @@ const STORAGE_KEYS = {
   activeRequestId: "rescueTeam.activeRequestId",
   progressByRequestPrefix: "rescueTeam.progress.",
   reports: "rescueTeam.reports",
-  sosEvents: "rescueTeam.sosEvents",
-};
-
-const safeParseJson = (value, fallback) => {
-  try {
-    if (!value) return fallback;
-    return JSON.parse(value);
-  } catch {
-    return fallback;
-  }
 };
 
 const clampNumber = (value, min, max) => {
@@ -212,12 +202,26 @@ const getEffectiveMissionStatus = (assignment) => {
   const missionStatus = assignment?.mission?.status ?? null;
   const assignmentStatus = assignment?.status ?? null;
 
+  const missionLikeStatuses = new Set([
+    "PENDING",
+    "ASSIGNED",
+    "IN_PROGRESS",
+    "ARRIVED",
+    "COMPLETED",
+    "CANCELLED",
+    "FAILED",
+  ]);
+
   // Prefer the non-PENDING status between mission.status and assignment.status.
   // Backend sometimes keeps one of them at PENDING while the other is already ASSIGNED.
   if (missionStatus && missionStatus !== "PENDING") return missionStatus;
-  if (assignmentStatus && assignmentStatus !== "PENDING")
+  if (
+    assignmentStatus &&
+    assignmentStatus !== "PENDING" &&
+    missionLikeStatuses.has(assignmentStatus)
+  )
     return assignmentStatus;
-  return missionStatus || assignmentStatus;
+  return missionStatus || null;
 };
 
 const pickFirstActionableAssignment = (list) => {
@@ -225,7 +229,9 @@ const pickFirstActionableAssignment = (list) => {
   return (
     list.find((a) => {
       if (!a?.mission) return false;
+      if (a?.status === "DECLINED") return false;
       const status = getEffectiveMissionStatus(a);
+      if (!status) return false;
       return (
         status !== "PENDING" && status !== "COMPLETED" && status !== "CANCELLED"
       );
@@ -249,6 +255,7 @@ const RescueTeamDashboard = () => {
   const [request, setRequest] = useState(null);
   const [mission, setMission] = useState(null);
   const [rescueTeamId, setRescueTeamId] = useState(null);
+  const [rescueTeamName, setRescueTeamName] = useState("");
   const [goongMap, setGoongMap] = useState(null);
   const [startingNavigation, setStartingNavigation] = useState(false);
   const [lastUpdatedAt, setLastUpdatedAt] = useState(Date.now());
@@ -426,6 +433,16 @@ const RescueTeamDashboard = () => {
           user?.rescueTeam?.id ??
           null;
 
+        const loadedRescueTeamName =
+          assignment.rescueTeamName ??
+          assignment.rescueTeam?.name ??
+          assignment.rescueTeam?.rescueTeamName ??
+          user?.rescueTeamName ??
+          user?.teamName ??
+          user?.rescueTeam?.name ??
+          user?.rescueTeam?.rescueTeamName ??
+          "";
+
         // Gọi API chi tiết rescue request để lấy SĐT + tình trạng/ghi chú
         const detailRes = await rescueRequestService.getRequestById(requestId);
         const detail = detailRes.success ? detailRes.data : null;
@@ -492,6 +509,7 @@ const RescueTeamDashboard = () => {
         setRequest(loadedRequest);
         setMission(missionData);
         setRescueTeamId(loadedRescueTeamId);
+        setRescueTeamName(String(loadedRescueTeamName || ""));
         setProgressStep(nextStep);
         setRouteSummary(null);
         setNavigationActive(false);
@@ -523,6 +541,7 @@ const RescueTeamDashboard = () => {
         if (!assignedRes.success) return;
 
         const assignment = pickFirstActionableAssignment(assignedRes.data);
+
         if (!assignment?.mission) return;
 
         const effectiveMissionStatus = getEffectiveMissionStatus(assignment);
@@ -561,6 +580,16 @@ const RescueTeamDashboard = () => {
           user?.teamID ??
           user?.rescueTeam?.id ??
           null;
+
+        const loadedRescueTeamName =
+          assignment.rescueTeamName ??
+          assignment.rescueTeam?.name ??
+          assignment.rescueTeam?.rescueTeamName ??
+          user?.rescueTeamName ??
+          user?.teamName ??
+          user?.rescueTeam?.name ??
+          user?.rescueTeam?.rescueTeamName ??
+          "";
         const detailRes = await rescueRequestService.getRequestById(requestId);
         const detail = detailRes.success ? detailRes.data : null;
 
@@ -574,6 +603,7 @@ const RescueTeamDashboard = () => {
           status: effectiveMissionStatus || assignment.mission?.status,
         });
         setRescueTeamId(loadedRescueTeamId);
+        setRescueTeamName(String(loadedRescueTeamName || ""));
         setRequest((prev) => ({
           ...(prev || {}),
           ...(detail || {}),
@@ -708,46 +738,9 @@ const RescueTeamDashboard = () => {
     document.title = "Quản Lý Nhiệm Vụ & Báo Cáo Cứu Hộ Hiện Trường";
   }, []);
 
-  const scrollToMap = () => {
-    mapRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-  };
-
-  const handleNavClick = (e, target) => {
-    e.preventDefault();
-    if (target === "tasks") {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    } else {
-      scrollToMap();
-    }
-  };
-
-  const handleSOS = async () => {
-    const ok = window.confirm(
-      "Bạn có chắc muốn gửi SOS? Hệ thống sẽ ghi nhận thời gian và vị trí (nếu có).",
-    );
-    if (!ok) return;
-
-    const event = {
-      at: Date.now(),
-      requestId: request?.id ?? null,
-      missionId: mission?.id ?? null,
-      coords: gps.coords,
-      user: authService.getCurrentUser()?.id ?? null,
-    };
-    const existing = safeParseJson(
-      localStorage.getItem(STORAGE_KEYS.sosEvents),
-      [],
-    );
-    localStorage.setItem(
-      STORAGE_KEYS.sosEvents,
-      JSON.stringify([event, ...existing].slice(0, 50)),
-    );
-
-    window.alert("Đã ghi nhận SOS. Vui lòng giữ an toàn.");
-  };
-
   const handleLogout = () => {
     try {
+      localStorage.removeItem("token");
       localStorage.removeItem("accessToken");
       localStorage.removeItem("refreshToken");
       localStorage.removeItem("user");
@@ -929,6 +922,18 @@ const RescueTeamDashboard = () => {
     );
   })();
 
+  const effectiveRescueTeamNameForUi = (() => {
+    const currentUser = authService.getCurrentUser();
+    const candidate =
+      rescueTeamName ||
+      currentUser?.rescueTeamName ||
+      currentUser?.teamName ||
+      currentUser?.rescueTeam?.name ||
+      currentUser?.rescueTeam?.rescueTeamName ||
+      "";
+    return String(candidate || "").trim();
+  })();
+
   const canStartNavigation =
     !loading &&
     !startingNavigation &&
@@ -961,7 +966,7 @@ const RescueTeamDashboard = () => {
                 Cứu Hộ VN
               </h2>
               <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">
-                Team Alpha-1
+                {effectiveRescueTeamNameForUi || "—"}
               </p>
             </div>
           </div>
@@ -973,30 +978,6 @@ const RescueTeamDashboard = () => {
           </div>
         </div>
         <div className="flex items-center gap-4 lg:gap-6">
-          <nav className="hidden lg:flex items-center gap-2 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
-            <a
-              className="px-4 py-2 rounded-md bg-white dark:bg-gray-700 shadow-sm text-primary text-sm font-bold"
-              href="#"
-              onClick={(e) => handleNavClick(e, "tasks")}
-            >
-              Nhiệm vụ
-            </a>
-            <a
-              className="px-4 py-2 rounded-md text-[#6b7680] dark:text-gray-400 text-sm font-bold hover:text-primary transition-colors"
-              href="#"
-              onClick={(e) => handleNavClick(e, "map")}
-            >
-              Bản đồ
-            </a>
-          </nav>
-          <button
-            type="button"
-            className="flex items-center justify-center rounded-lg h-11 px-6 bg-red-600 hover:bg-red-700 text-white text-sm font-black shadow-lg shadow-red-600/30 transition-all active:scale-95 border-2 border-red-500"
-            onClick={handleSOS}
-          >
-            <span className="material-symbols-outlined mr-2">campaign</span>
-            <span>SOS</span>
-          </button>
           <button
             type="button"
             className="hidden md:flex items-center justify-center rounded-lg h-11 px-5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 text-sm font-black shadow-sm transition-all active:scale-95 border-2 border-gray-200 dark:border-gray-700"
@@ -1020,10 +1001,15 @@ const RescueTeamDashboard = () => {
         <aside className="hidden lg:flex flex-col w-72 border-r border-[#e5e7eb] dark:border-[#374151] bg-white dark:bg-[#1c1e22] p-4 gap-6 z-20 shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
           <div className="px-2">
             <h1 className="text-[#131416] dark:text-white text-xl font-black mb-1">
-              Đội Cứu Hộ 01
+              {effectiveRescueTeamIdForUi !== null &&
+              effectiveRescueTeamIdForUi !== undefined
+                ? `Đội Cứu Hộ ${effectiveRescueTeamIdForUi}`
+                : "Đội Cứu Hộ"}
             </h1>
             <p className="text-sm text-gray-500 font-medium">
-              Khu vực: Quận 1 - Bình Thạnh
+              {effectiveRescueTeamNameForUi
+                ? `Khu vực: ${effectiveRescueTeamNameForUi}`
+                : "Khu vực: —"}
             </p>
           </div>
           <nav className="flex flex-col gap-2 flex-1">
@@ -1035,22 +1021,6 @@ const RescueTeamDashboard = () => {
               <span className="bg-white/20 px-2.5 py-0.5 rounded text-xs font-bold">
                 {hasActiveMission ? 1 : 0}
               </span>
-            </div>
-            <div
-              className="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-              role="button"
-              tabIndex={0}
-              onClick={scrollToMap}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") scrollToMap();
-              }}
-            >
-              <span className="material-symbols-outlined">map</span>
-              <p className="text-sm font-bold">Bản đồ khu vực</p>
-            </div>
-            <div className="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-              <span className="material-symbols-outlined">history</span>
-              <p className="text-sm font-bold">Lịch sử</p>
             </div>
           </nav>
           <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-800">
@@ -1294,6 +1264,203 @@ const RescueTeamDashboard = () => {
                           </div>
                         </div>
 
+                        <div className="bg-white dark:bg-[#1c1e22] border border-gray-200 dark:border-gray-700 rounded-2xl overflow-hidden">
+                          <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/30 flex items-center justify-center">
+                                <span className="material-symbols-outlined text-blue-600">
+                                  assignment_turned_in
+                                </span>
+                              </div>
+                              <div>
+                                <p className="text-xs font-black uppercase tracking-widest text-gray-400">
+                                  Chi tiết nhiệm vụ
+                                </p>
+                                <p className="text-base font-black text-gray-900 dark:text-white leading-tight">
+                                  {mission?.missionType || "—"}
+                                </p>
+                              </div>
+                            </div>
+                            <span className="text-xs font-black px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 whitespace-nowrap">
+                              {mission?.missionType || "—"}
+                            </span>
+                          </div>
+
+                          <div className="p-5 space-y-6">
+                            <div>
+                              <div className="flex items-center gap-2 mb-3">
+                                <span className="material-symbols-outlined text-gray-400 text-sm">
+                                  local_shipping
+                                </span>
+                                <p className="text-xs font-black uppercase tracking-widest text-gray-400">
+                                  Phương tiện (Vehicles)
+                                </p>
+                              </div>
+
+                              {mission?.vehicles?.length > 0 ? (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                  {mission.vehicles.map((v, idx) => {
+                                    const title = v?.type || "—";
+                                    const model = v?.model || "";
+                                    const license = v?.licensePlate || "—";
+                                    const capacity = Number.isFinite(
+                                      Number(v?.capacityPerson),
+                                    )
+                                      ? `${Number(v.capacityPerson)} người`
+                                      : "—";
+                                    const status = v?.status
+                                      ? String(v.status).toUpperCase()
+                                      : "";
+                                    const statusCls = (() => {
+                                      if (!status)
+                                        return "bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-900 dark:text-gray-200 dark:border-gray-700";
+                                      if (status === "IN_USE") {
+                                        return "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-900/30";
+                                      }
+                                      if (status === "AVAILABLE") {
+                                        return "bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-900/30";
+                                      }
+                                      if (status === "MAINTENANCE") {
+                                        return "bg-yellow-50 text-yellow-800 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-900/30";
+                                      }
+                                      return "bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-900 dark:text-gray-200 dark:border-gray-700";
+                                    })();
+
+                                    return (
+                                      <div
+                                        key={
+                                          v?.missionVehicleId ??
+                                          v?.vehicleId ??
+                                          v?.licensePlate ??
+                                          idx
+                                        }
+                                        className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm p-4 min-w-[200px] w-full flex flex-col gap-3"
+                                      >
+                                        <div className="flex items-start justify-between gap-3">
+                                          <p className="text-base font-black text-gray-900 dark:text-white leading-snug break-words">
+                                            {title}
+                                          </p>
+                                          {!!status && (
+                                            <span
+                                              className={`text-xs font-black px-2.5 py-1 rounded-full border whitespace-nowrap ${statusCls}`}
+                                            >
+                                              {status}
+                                            </span>
+                                          )}
+                                        </div>
+
+                                        <p className="text-sm font-bold text-gray-500 break-words">
+                                          {model || "—"}
+                                        </p>
+
+                                        <div className="mt-auto pt-1 flex items-center gap-2 flex-wrap">
+                                          <span className="text-xs font-black px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200">
+                                            Biển số: {license}
+                                          </span>
+                                          <span className="text-xs font-black px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200">
+                                            Sức chứa: {capacity}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              ) : (
+                                <div className="bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl p-4 flex items-center gap-3">
+                                  <span className="material-symbols-outlined text-gray-400">
+                                    no_transfer
+                                  </span>
+                                  <p className="text-sm font-bold text-gray-500">
+                                    Chưa có phương tiện được gán.
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+
+                            {mission?.missionType === "RELIEF" && (
+                              <div>
+                                <div className="flex items-center gap-2 mb-3">
+                                  <span className="material-symbols-outlined text-gray-400 text-sm">
+                                    inventory_2
+                                  </span>
+                                  <p className="text-xs font-black uppercase tracking-widest text-gray-400">
+                                    Vật tư (Supplies)
+                                  </p>
+                                </div>
+
+                                {mission?.supplies?.length > 0 ? (
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    {mission.supplies.map((s, idx) => {
+                                      const name = s?.itemName || "—";
+                                      const type = s?.itemType || "—";
+                                      const qty = Number.isFinite(
+                                        Number(s?.quantity),
+                                      )
+                                        ? Number(s.quantity)
+                                        : null;
+
+                                      const typeBadgeClass =
+                                        type === "FOOD"
+                                          ? "bg-green-100 text-green-700"
+                                          : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200";
+
+                                      return (
+                                        <div
+                                          key={
+                                            s?.missionSupplyId ??
+                                            s?.inventoryId ??
+                                            s?.itemId ??
+                                            idx
+                                          }
+                                          className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow flex flex-col gap-3 p-4"
+                                        >
+                                          <div className="flex justify-between items-start gap-3 min-w-0">
+                                            <p className="font-extrabold text-gray-800 dark:text-white text-lg truncate min-w-0">
+                                              {name}
+                                            </p>
+
+                                            <span
+                                              className={`px-2 py-1 text-[10px] font-bold rounded-md whitespace-nowrap ${typeBadgeClass}`}
+                                            >
+                                              {type}
+                                            </span>
+                                          </div>
+
+                                          <div className="mt-auto text-right">
+                                            {qty !== null ? (
+                                              <div className="inline-flex items-baseline gap-2">
+                                                <span className="text-sm text-gray-500">
+                                                  x
+                                                </span>
+                                                <span className="text-xl font-black text-gray-800 dark:text-white">
+                                                  {qty}
+                                                </span>
+                                              </div>
+                                            ) : (
+                                              <span className="text-sm font-bold text-gray-500">
+                                                —
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                ) : (
+                                  <div className="bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl p-4 flex items-center gap-3">
+                                    <span className="material-symbols-outlined text-gray-400">
+                                      inventory
+                                    </span>
+                                    <p className="text-sm font-bold text-gray-500">
+                                      Chưa có vật tư được gán.
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
                         <div>
                           <p className="text-gray-500 text-xs font-bold uppercase mb-2">
                             Địa chỉ chính xác
@@ -1415,16 +1582,6 @@ const RescueTeamDashboard = () => {
           )}
         </section>
       </main>
-
-      <button
-        type="button"
-        className="lg:hidden fixed bottom-6 right-6 w-16 h-16 bg-red-600 rounded-full flex items-center justify-center text-white shadow-2xl z-50 ring-4 ring-red-600/30"
-        onClick={handleSOS}
-      >
-        <span className="material-symbols-outlined text-4xl">
-          emergency_share
-        </span>
-      </button>
 
       <button
         type="button"
