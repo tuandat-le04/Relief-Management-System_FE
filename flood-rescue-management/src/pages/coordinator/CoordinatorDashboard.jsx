@@ -9,6 +9,7 @@ import CancelRequestModal from "../../components/coordinator/CancelRequestModal"
 import ClassifyRequestModal from "../../components/coordinator/ClassifyRequestModal";
 import RequestDetailModal from "../../components/coordinator/RequestDetailModal";
 import AssignMissionModal from "../../components/coordinator/AssignMissionModal";
+import CompleteRequestModal from "../../components/coordinator/CompleteRequestModal";
 import useMap from "../../hooks/useMap";
 import "../../assets/styles/coordinator.css";
 import rescueRequestService from "../../services/rescueRequestService";
@@ -65,6 +66,35 @@ const buildActiveRequestIdSet = (activeRows) => {
   return set;
 };
 
+const pickBetterMission = (primary, secondary) => {
+  if (!primary) return secondary || null;
+  if (!secondary) return primary || null;
+
+  // Ưu tiên mission mới hơn theo updated time
+  const primaryTime = getMissionUpdatedTime(primary);
+  const secondaryTime = getMissionUpdatedTime(secondary);
+  const newer = primaryTime >= secondaryTime ? primary : secondary;
+  const older = newer === primary ? secondary : primary;
+
+  // Backfill các field report để tránh mất dữ liệu khi endpoint active-teams trả thiếu
+  return {
+    ...older,
+    ...newer,
+    peopleRescued:
+      newer?.peopleRescued !== undefined && newer?.peopleRescued !== null
+        ? newer.peopleRescued
+        : older?.peopleRescued,
+    summary:
+      newer?.summary !== undefined && newer?.summary !== null
+        ? newer.summary
+        : older?.summary,
+    obstacles:
+      newer?.obstacles !== undefined && newer?.obstacles !== null
+        ? newer.obstacles
+        : older?.obstacles,
+  };
+};
+
 const getRequestStage = (request, mission, isActiveTeamAssigned = false) => {
   if (!request) return "pending";
   if (request.status === "CANCELLED") return "cancelled";
@@ -117,13 +147,38 @@ const fetchCoordinatorSnapshot = async () => {
     };
   }
 
+  const missionMapFromAll = missionResult.success
+    ? buildLatestMissionMap(missionResult.data)
+    : {};
+
+  const missionMapFromActive = {};
+  if (activeTeamsResult.success && Array.isArray(activeTeamsResult.data)) {
+    activeTeamsResult.data.forEach((row) => {
+      const mission = row?.mission;
+      const reqId =
+        row?.request?.id ??
+        mission?.requestId ??
+        mission?.requestID ??
+        mission?.request?.id ??
+        null;
+      if (reqId !== null && reqId !== undefined && mission) {
+        missionMapFromActive[String(reqId)] = mission;
+      }
+    });
+  }
+
+  const mergedMissionMap = { ...missionMapFromAll };
+  Object.keys(missionMapFromActive).forEach((requestIdKey) => {
+    const fromAll = mergedMissionMap[requestIdKey] ?? null;
+    const fromActive = missionMapFromActive[requestIdKey] ?? null;
+    mergedMissionMap[requestIdKey] = pickBetterMission(fromAll, fromActive);
+  });
+
   return {
     success: true,
     error: null,
     requests: requestResult.data,
-    missionMap: missionResult.success
-      ? buildLatestMissionMap(missionResult.data)
-      : {},
+    missionMap: mergedMissionMap,
     activeRequestIds: activeTeamsResult.success
       ? buildActiveRequestIdSet(activeTeamsResult.data)
       : new Set(),
@@ -147,6 +202,10 @@ const CoordinatorDashboard = () => {
   const [classifyModalOpen, setClassifyModalOpen] = useState(false);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [completeModalOpen, setCompleteModalOpen] = useState(false);
+  const [selectedMissionForComplete, setSelectedMissionForComplete] = useState(null);
+  const [loadingCompleteMission, setLoadingCompleteMission] = useState(false);
+  const [confirmingComplete, setConfirmingComplete] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
 
   // Map hook
@@ -241,7 +300,8 @@ const CoordinatorDashboard = () => {
     }
   };
 
-  const handleCompleteRequest = async (requestId) => {
+  const handleOpenCompleteModal = async (requestId) => {
+    const req = requestsWithMission.find((r) => String(r.id) === String(requestId));
     const mission = missionByRequestId[String(requestId)] ?? null;
     if (!mission || mission.status !== "COMPLETED") {
       alert(
@@ -250,18 +310,43 @@ const CoordinatorDashboard = () => {
       return;
     }
 
+    setSelectedRequest(req || null);
+    setSelectedMissionForComplete(mission);
+    setCompleteModalOpen(true);
+    setLoadingCompleteMission(true);
+
     try {
-      const result = await missionService.updateMissionStatus(mission.id, {
-        status: "COMPLETED",
-      });
+      const detailRes = await missionService.getMissionById(mission.id);
+      if (detailRes.success && detailRes.data) {
+        setSelectedMissionForComplete(detailRes.data);
+      }
+    } finally {
+      setLoadingCompleteMission(false);
+    }
+  };
+
+  const handleConfirmCompleteRequest = async () => {
+    if (!selectedRequest?.id) return;
+
+    try {
+      setConfirmingComplete(true);
+      const result = await rescueRequestService.updateRequestStatus(
+        selectedRequest.id,
+        "COMPLETED",
+      );
       if (result.success) {
+        setCompleteModalOpen(false);
+        setSelectedMissionForComplete(null);
+        setSelectedRequest(null);
         await refreshRequests();
         setTimeout(() => setActiveTab("completed"), 500);
       } else {
         alert("❌ " + result.error);
       }
     } catch {
-      alert("❌ Không thể cập nhật trạng thái");
+      alert("❌ Không thể xác nhận hoàn thành");
+    } finally {
+      setConfirmingComplete(false);
     }
   };
 
@@ -417,7 +502,7 @@ const CoordinatorDashboard = () => {
                   stage={request.stage}
                   mission={request.mission}
                   onApprove={handleApproveRequest}
-                  onComplete={handleCompleteRequest}
+                  onComplete={handleOpenCompleteModal}
                   onCancel={openCancelModal}
                   onClassify={openClassifyModal}
                   onDetail={openDetailModal}
@@ -455,6 +540,19 @@ const CoordinatorDashboard = () => {
         onClose={() => setAssignModalOpen(false)}
         request={selectedRequest}
         onSuccess={refreshRequests}
+      />
+      <CompleteRequestModal
+        isOpen={completeModalOpen}
+        onClose={() => {
+          if (confirmingComplete) return;
+          setCompleteModalOpen(false);
+          setSelectedMissionForComplete(null);
+        }}
+        onConfirm={handleConfirmCompleteRequest}
+        request={selectedRequest}
+        mission={selectedMissionForComplete}
+        loadingMission={loadingCompleteMission}
+        confirming={confirmingComplete}
       />
 
       {/* Styles cho map markers và animations */}

@@ -1,5 +1,12 @@
 import api from "./api";
 
+const MISSIONS_CACHE_TTL_MS = 60 * 1000;
+const MISSIONS_REQUEST_TIMEOUT_MS = 25000;
+let missionsCache = {
+  data: [],
+  fetchedAt: 0,
+};
+
 const extractMissionRequestId = (mission) =>
   mission?.requestId ?? mission?.requestID ?? mission?.request?.id ?? null;
 
@@ -38,13 +45,27 @@ const missionService = {
 
   // ── GET /api/v1/missions ─────────────────────────────────────────────────
   // Lấy toàn bộ nhiệm vụ (dành cho Coordinator/Admin)
-  getAllMissions: async () => {
+  getAllMissions: async ({ force = false } = {}) => {
     try {
-      const response = await api.get("/missions");
+      const now = Date.now();
+      const hasFreshCache =
+        !force &&
+        Array.isArray(missionsCache.data) &&
+        missionsCache.data.length > 0 &&
+        now - missionsCache.fetchedAt < MISSIONS_CACHE_TTL_MS;
+
+      if (hasFreshCache) {
+        return { success: true, data: missionsCache.data, cached: true };
+      }
+
+      const response = await api.get("/missions", {
+        timeout: MISSIONS_REQUEST_TIMEOUT_MS,
+      });
       if (response.data?.success) {
         const list = Array.isArray(response.data?.data)
           ? response.data.data
           : [];
+        missionsCache = { data: list, fetchedAt: Date.now() };
         return { success: true, data: list };
       }
       return {
@@ -52,7 +73,30 @@ const missionService = {
         error: response.data?.message || "Không thể tải danh sách nhiệm vụ",
       };
     } catch (error) {
-      console.error("Error fetching all missions:", error);
+      const isTimeout =
+        error?.code === "ECONNABORTED" ||
+        String(error?.message || "")
+          .toLowerCase()
+          .includes("timeout");
+
+      if (Array.isArray(missionsCache.data) && missionsCache.data.length > 0) {
+        console.warn(
+          "getAllMissions timeout/error, fallback to cached missions.",
+        );
+        return {
+          success: true,
+          data: missionsCache.data,
+          cached: true,
+          stale: true,
+        };
+      }
+
+      if (isTimeout) {
+        console.warn("getAllMissions timeout with no cache.");
+      } else {
+        console.error("Error fetching all missions:", error);
+      }
+
       return {
         success: false,
         error:
@@ -114,8 +158,18 @@ const missionService = {
   ) => {
     try {
       const body = { status };
-      if (peopleRescued !== undefined) body.peopleRescued = peopleRescued;
-      if (summary !== undefined) body.summary = summary;
+      if (peopleRescued !== undefined) {
+        body.peopleRescued = peopleRescued;
+        // Fallback alias cho backend dùng naming khác
+        body.rescuedCount = peopleRescued;
+      }
+      if (summary !== undefined) {
+        body.summary = summary;
+        // Fallback alias cho backend dùng naming khác
+        body.description = summary;
+        body.reportSummary = summary;
+        body.report = summary;
+      }
       if (obstacles !== undefined) body.obstacles = obstacles;
 
       const response = await api.patch(`/missions/${id}/status`, body);

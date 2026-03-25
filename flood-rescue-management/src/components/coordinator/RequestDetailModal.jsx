@@ -112,6 +112,55 @@ const formatDateTime = (isoString) => {
   });
 };
 
+const SUPPLY_LABEL_MAP = {
+  food: "Lương thực",
+  water: "Nước uống",
+  medicine: "Thuốc men",
+  medical: "Vật tư y tế",
+  first_aid: "Sơ cứu",
+  firstaid: "Sơ cứu",
+  blanket: "Chăn",
+  clothes: "Quần áo",
+  clothing: "Quần áo",
+  baby_milk: "Sữa em bé",
+  milk: "Sữa",
+  rice: "Gạo",
+  instant_noodles: "Mì gói",
+  noodle: "Mì gói",
+  fuel: "Nhiên liệu",
+  flashlight: "Đèn pin",
+  battery: "Pin",
+  hygiene: "Đồ vệ sinh cá nhân",
+};
+
+const normalizeSupplyToken = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_")
+    .replace(/-/g, "_");
+
+const toVietnameseSupply = (raw) => {
+  const key = normalizeSupplyToken(raw);
+  if (!key) return "";
+  if (SUPPLY_LABEL_MAP[key]) return SUPPLY_LABEL_MAP[key];
+  return String(raw)
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+};
+
+const parseRequestSupplies = (raw) => {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === "string") {
+    return raw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+  return [raw];
+};
+
 const RequestDetailModal = ({ isOpen, onClose, request }) => {
   const [lightboxIdx, setLightboxIdx] = useState(null);
 
@@ -144,6 +193,10 @@ const RequestDetailModal = ({ isOpen, onClose, request }) => {
     PRIORITY_CONFIG[request.priority] || PRIORITY_CONFIG["NORMAL"];
   const status = STATUS_CONFIG[request.status] || STATUS_CONFIG["CREATED"];
   const reqType = TYPE_CONFIG[request.requestType] || TYPE_CONFIG["OTHER"];
+  const supplyTokens = parseRequestSupplies(request.requestSupplies);
+  const displaySupplies = supplyTokens
+    .map(toVietnameseSupply)
+    .filter(Boolean);
 
   // Theo F3: phân loại bằng mediaType (IMAGE / VIDEO), không check extension
   const isVideo = (media) => media.mediaType === "VIDEO";
@@ -370,9 +423,18 @@ const RequestDetailModal = ({ isOpen, onClose, request }) => {
                   {request.description || "Không có mô tả"}
                 </p>
               </Row>
-              {request.requestSupplies && (
+              {displaySupplies.length > 0 && (
                 <Row icon="inventory_2" label="Vật tư yêu cầu">
-                  <p className="leading-relaxed">{request.requestSupplies}</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {displaySupplies.map((supply, idx) => (
+                      <span
+                        key={`${supply}-${idx}`}
+                        className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200"
+                      >
+                        {supply}
+                      </span>
+                    ))}
+                  </div>
                 </Row>
               )}
             </div>
