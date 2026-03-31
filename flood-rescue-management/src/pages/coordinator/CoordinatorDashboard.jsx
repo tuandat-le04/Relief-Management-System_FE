@@ -17,6 +17,8 @@ import missionService from "../../services/missionService";
 
 const getMissionRequestId = (mission) =>
   mission?.requestId ?? mission?.requestID ?? mission?.request?.id ?? null;
+// - Chuẩn hóa requestId từ mission
+// - Vì BE có thể trả field theo nhiều kiểu (`requestId`, `requestID`, nested `request.id`)
 
 const getMissionUpdatedTime = (mission) => {
   const raw =
@@ -28,6 +30,8 @@ const getMissionUpdatedTime = (mission) => {
   const time = new Date(raw).getTime();
   return Number.isFinite(time) ? time : 0;
 };
+// - Lấy mốc thời gian đại diện cho mission
+// - Dùng để chọn mission mới nhất nếu có nhiều mission liên quan một request
 
 const buildLatestMissionMap = (missions) => {
   const map = {};
@@ -50,6 +54,8 @@ const buildLatestMissionMap = (missions) => {
   });
   return map;
 };
+// - Coordinator list request, nhưng cần biết mission mới nhất của từng request
+// - Hàm này giúp gắn mission tương ứng vào mỗi request card
 
 const buildActiveRequestIdSet = (activeRows) => {
   const set = new Set();
@@ -65,6 +71,7 @@ const buildActiveRequestIdSet = (activeRows) => {
   });
   return set;
 };
+// - Nếu request đang `IN_PROGRESS` nhưng mission chưa map rõ ràng, vẫn có thể đẩy request vào tab `inprogress`
 
 const pickBetterMission = (primary, secondary) => {
   if (!primary) return secondary || null;
@@ -94,6 +101,11 @@ const pickBetterMission = (primary, secondary) => {
         : older?.obstacles,
   };
 };
+// - ưu tiên mission có `updatedAt` mới hơn
+// - backfill các field report:
+// - `peopleRescued`
+// - `summary`
+// - `obstacles`
 
 const getRequestStage = (request, mission, isActiveTeamAssigned = false) => {
   if (!request) return "pending";
@@ -123,6 +135,14 @@ const getRequestStage = (request, mission, isActiveTeamAssigned = false) => {
 
   return "pending";
 };
+//- `request.status === CANCELLED` -> `cancelled`
+//- `request.status === COMPLETED` -> `completed`
+//- `mission.status === COMPLETED` -> vẫn là `inprogress`
+//- `mission.status === IN_PROGRESS | ARRIVED | ASSIGNED` -> `inprogress`
+//- `request.status === PENDING` -> `pending`
+//- `request.status === IN_PROGRESS`:
+//  - nếu có active team -> `inprogress`
+//  - nếu chưa -> `accepted`
 
 /**
  * Chuẩn hoá dữ liệu cho màn hình Coordinator trong 1 lần gọi API:
@@ -267,6 +287,14 @@ const CoordinatorDashboard = () => {
       setLoading(false);
     }
   };
+//1. `setLoading(true)`
+//2. gọi `fetchCoordinatorSnapshot()`
+//3. nếu success:
+//   - `setRequests(...)`
+//   - `setMissionByRequestId(...)`
+//   - `setActiveTeamRequestIds(...)`
+//4. nếu lỗi: `setError(...)`
+//5. `setLoading(false)`
 
   useEffect(() => {
     fetchRequests();

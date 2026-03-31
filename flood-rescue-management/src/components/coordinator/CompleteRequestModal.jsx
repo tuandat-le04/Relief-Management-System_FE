@@ -64,7 +64,9 @@ const CompleteRequestModal = ({
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
         <div className="bg-gradient-to-r from-emerald-600 to-green-600 px-6 py-4 flex items-center justify-between">
           <div>
-            <h2 className="text-white font-bold text-lg">Xác nhận hoàn thành</h2>
+            <h2 className="text-white font-bold text-lg">
+              Xác nhận hoàn thành
+            </h2>
             <p className="text-emerald-100 text-sm">
               Xem báo cáo từ team trước khi hoàn tất yêu cầu
             </p>
@@ -82,36 +84,31 @@ const CompleteRequestModal = ({
           <p className="text-sm font-bold text-slate-800">
             Yêu cầu #{request?.id} · {request?.name || "Không rõ"}
           </p>
-          <p className="text-xs text-slate-500 mt-1">{request?.location || "—"}</p>
+          <p className="text-xs text-slate-500 mt-1">
+            {request?.location || "—"}
+          </p>
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {loadingMission ? (
             <div className="py-10 flex flex-col items-center justify-center gap-3 text-slate-500">
               <span className="animate-spin rounded-full h-7 w-7 border-b-2 border-emerald-600" />
-              <p className="text-sm font-medium">Đang tải báo cáo của team...</p>
+              <p className="text-sm font-medium">
+                Đang tải báo cáo của team...
+              </p>
             </div>
           ) : (
             <>
               <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 mb-4">
                 <p className="text-xs font-bold text-emerald-800 uppercase tracking-wide">
-                  Mission #{mission?.id || "—"} · Trạng thái: {mission?.status || "—"}
+                  Mission #{mission?.id || "—"} · Trạng thái:{" "}
+                  {mission?.status || "—"}
                 </p>
                 <p className="text-[12px] text-emerald-700 mt-1">
-                  Cập nhật lần cuối: {formatDateTime(mission?.updatedAt || mission?.endTime)}
+                  Cập nhật lần cuối:{" "}
+                  {formatDateTime(mission?.updatedAt || mission?.endTime)}
                 </p>
               </div>
-
-              <DetailRow
-                icon="groups"
-                label="Số người đã cứu"
-                value={peopleRescued}
-              />
-              <DetailRow
-                icon="description"
-                label="Báo cáo từ team"
-                value={teamSummary || "Team chưa gửi tóm tắt."}
-              />
             </>
           )}
         </div>
@@ -136,7 +133,9 @@ const CompleteRequestModal = ({
               </>
             ) : (
               <>
-                <span className="material-symbols-outlined text-sm">done_all</span>
+                <span className="material-symbols-outlined text-sm">
+                  done_all
+                </span>
                 <span>Xác nhận hoàn thành</span>
               </>
             )}
